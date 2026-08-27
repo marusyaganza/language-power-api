@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from word.word import Word
+from words.word import Word
 
 class DictionaryProvider(ABC):
     @abstractmethod

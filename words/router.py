@@ -2,22 +2,13 @@ from fastapi import APIRouter, HTTPException
 from words.schemas import WordOut
 router = APIRouter()
 
-from dictionary.en.mock import MockEnglishDictionaryProvider
-from dictionary.es.mock import MockSpanishDictionaryProvider
-
-PROVIDERS = {
-    "en": MockEnglishDictionaryProvider,
-    "es": MockSpanishDictionaryProvider,
-}
+from dictionary.providers import PROVIDERS
 
 @router.get("/word/search", response_model=list[WordOut])
 async def search_word(query: str, language: str):
-    print('query', query, language)
-    provider_cls = PROVIDERS.get(language)
-    if provider_cls is None:
+    provider = PROVIDERS.get(language)
+    if provider is None:
         raise HTTPException(status_code=400, detail=f"Unsupported language: {language}")
-    provider = provider_cls(language)
-
     results = await provider.fetch(query)
 
     if not results:

@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
-from word.language import Language
+from words.language import Language
+from words.example import Example
 
 class WordOut(BaseModel):
     model_config = {"from_attributes": True}
@@ -12,3 +13,4 @@ class WordOut(BaseModel):
     fl: str
     audio_url: str
     transcription:str
+    examples: list[Example]

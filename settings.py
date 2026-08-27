@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     english_api_url: str
     audio_endpoint: str
     img_endpoint: str
+    use_mocks: str
 
     model_config = SettingsConfigDict(env_file=".env")
 

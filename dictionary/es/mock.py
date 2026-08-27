@@ -1,13 +1,13 @@
 # providers/mock.py
 import json
 from pathlib import Path
-from word.language import Language
+from words.language import Language
 import asyncio
 from dictionary.es.es import SpanishDictionaryProvider
 
 class MockSpanishDictionaryProvider(SpanishDictionaryProvider):
-    def __init__(self, language: str):
-        self.language = language
+    def __init__(self):
+        self.language = Language('es')
         self._fixtures_dir = Path(__file__).parent.parent / "fixtures"
 
     async def _fetch_raw(self, query: str):
