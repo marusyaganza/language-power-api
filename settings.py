@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     audio_endpoint: str
     img_endpoint: str
     use_mocks: str
+    database_url: str = "postgresql+psycopg2://app_user:dev_password@localhost:5432/language_app"
+    signup_enabled: bool = True
 
     model_config = SettingsConfigDict(env_file=".env")
 

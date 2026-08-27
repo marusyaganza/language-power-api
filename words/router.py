@@ -4,7 +4,7 @@ router = APIRouter()
 
 from dictionary.providers import PROVIDERS
 
-@router.get("/word/search", response_model=list[WordOut])
+@router.get("/words/search", response_model=list[WordOut])
 async def search_word(query: str, language: str):
     provider = PROVIDERS.get(language)
     if provider is None:
