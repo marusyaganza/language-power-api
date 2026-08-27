@@ -11,6 +11,13 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg2://app_user:dev_password@localhost:5432/language_app"
     signup_enabled: bool = True
 
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+
+    session_cookie_name: str = "session_id"
+    session_ttl_seconds: int = 60 * 60 * 24 * 30  # 30 days
+    cookie_secure: bool = False  
+
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()  # automatically loads and validates from .env
