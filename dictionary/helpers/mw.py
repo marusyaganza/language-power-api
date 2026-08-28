@@ -45,7 +45,8 @@ def extract_audio(word, language, countryCode):
                 subdir = 'bix'
             if not subdir.isalpha():
                 subdir = 'number'
-                audio_url = f'{settings.audio_endpoint}/{language}/{countryCode}/mp3/{subdir}/{audio}.mp3'
+
+            audio_url = f'{settings.audio_endpoint}/{language}/{countryCode}/mp3/{subdir}/{audio}.mp3'
     return audio_url
 
 def format_name(str):

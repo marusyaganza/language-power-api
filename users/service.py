@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 import bcrypt
 
 from users.models import User
-from users.schemas import UserCreate
+from auth.schemas import UserCreate
 
 
 def hash_password(password: str) -> str:

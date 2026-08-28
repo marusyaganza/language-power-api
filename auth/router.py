@@ -4,10 +4,11 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from settings import settings
 from users import service as users_service
-from users.schemas import UserCreate, UserOut
+from auth.schemas import UserCreate, UserOut
 from auth.service import create_session
 from auth.dependencies import get_current_user
 from users.models import User
+from auth.schemas import LoginRequest
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -31,6 +32,28 @@ def signup(user_in: UserCreate, response: Response, db: Session = Depends(get_db
 
     session_id = create_session(user.id)
 
+    response.set_cookie(
+        key=settings.session_cookie_name,
+        value=session_id,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        max_age=settings.session_ttl_seconds,
+    )
+
+    return user
+
+@auth_router.post("/login", response_model=UserOut)
+def login(credentials: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    user = users_service.get_user_by_email(db, credentials.email)
+
+    if user is None or not users_service.verify_password(credentials.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+        )
+
+    session_id = create_session(user.id)
     response.set_cookie(
         key=settings.session_cookie_name,
         value=session_id,
