@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, Response, HTTPException, status
+from fastapi import APIRouter, Depends, Response, HTTPException, status, Cookie
 from sqlalchemy.orm import Session
 
 from core.database import get_db
 from settings import settings
 from users import service as users_service
 from auth.schemas import UserCreate, UserOut
-from auth.service import create_session
+from auth.service import create_session, destroy_session
 from auth.dependencies import get_current_user
 from users.models import User
 from auth.schemas import LoginRequest
+from auth.helpers import set_session_cookie, clear_session_cookie
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -31,15 +32,8 @@ def signup(user_in: UserCreate, response: Response, db: Session = Depends(get_db
     user = users_service.create_user(db, user_in)
 
     session_id = create_session(user.id)
-
-    response.set_cookie(
-        key=settings.session_cookie_name,
-        value=session_id,
-        httponly=True,
-        secure=settings.cookie_secure,
-        samesite="lax",
-        max_age=settings.session_ttl_seconds,
-    )
+    set_session_cookie(response, session_id)
+   
 
     return user
 
@@ -54,16 +48,21 @@ def login(credentials: LoginRequest, response: Response, db: Session = Depends(g
         )
 
     session_id = create_session(user.id)
-    response.set_cookie(
-        key=settings.session_cookie_name,
-        value=session_id,
-        httponly=True,
-        secure=settings.cookie_secure,
-        samesite="lax",
-        max_age=settings.session_ttl_seconds,
-    )
+    set_session_cookie(response, session_id)
 
     return user
+
+@auth_router.post("/logout")
+def logout(
+    response: Response,
+    session_id: str | None = Cookie(default=None),
+):
+    if session_id is not None:
+        destroy_session(session_id)
+
+    clear_session_cookie(response)
+
+    return {"detail": "Logged out"}
 
 @auth_router.get("/config")
 def auth_config():
