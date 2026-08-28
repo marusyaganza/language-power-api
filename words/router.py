@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from words.schemas import WordOut
-router = APIRouter()
-
 from dictionary.providers import PROVIDERS
+from auth.dependencies import get_current_user
+
+
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 @router.get("/words/search", response_model=list[WordOut])
 async def search_word(query: str, language: str):

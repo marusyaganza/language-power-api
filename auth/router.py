@@ -6,6 +6,8 @@ from settings import settings
 from users import service as users_service
 from users.schemas import UserCreate, UserOut
 from auth.service import create_session
+from auth.dependencies import get_current_user
+from users.models import User
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -43,3 +45,8 @@ def signup(user_in: UserCreate, response: Response, db: Session = Depends(get_db
 @auth_router.get("/config")
 def auth_config():
     return {"signup_enabled": settings.signup_enabled}
+
+
+@auth_router.get("/me", response_model=UserOut)
+def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
