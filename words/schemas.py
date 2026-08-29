@@ -53,3 +53,14 @@ class VocabularyPage(BaseModel):
     page_size: int
     total: int
     total_pages: int
+
+class ExampleUpdate(BaseModel):
+    text: str
+    translation: str
+
+
+class WordUpdate(BaseModel):
+    defs: list[str] | None = None
+    examples: list[ExampleUpdate] | None = None
+    audio_url: str | None = None
+    img_url: str | None = None

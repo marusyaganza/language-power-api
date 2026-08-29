@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from sqlalchemy.orm import Session
 from core.database import get_db
-from words.service import save_word, get_vocabulary_page, delete_word
+from words.service import save_word, get_vocabulary_page, delete_word, update_word
 from words.repository import get_saved_uuids
-from words.schemas import WordOut, WordCreate, VocabularyPage, VocabularySortBy
+from words.schemas import WordOut, WordCreate, VocabularyPage, VocabularySortBy, WordUpdate
 from dictionary.providers import PROVIDERS
 from auth.dependencies import get_current_user
 
@@ -45,6 +45,7 @@ def create_word(
 
 @router.get("/words/vocabulary", response_model=VocabularyPage)
 def vocabulary(
+    language: str,
     query: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     sort_by: VocabularySortBy = Query(default=VocabularySortBy.created_at),
@@ -52,7 +53,7 @@ def vocabulary(
     current_user=Depends(get_current_user),
 ):
     return get_vocabulary_page(
-        db, current_user.id, query=query, page=page, sort_by=sort_by
+        db, current_user.id, language=language, query=query, page=page, sort_by=sort_by
     )
 
 @router.delete("/words/{word_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -62,3 +63,12 @@ def remove_word(
     current_user=Depends(get_current_user),
 ):
     delete_word(db, current_user.id, word_id)
+
+@router.patch("/words/{word_id}", response_model=WordOut)
+def edit_word(
+    word_id: int,
+    payload: WordUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    return update_word(db, current_user.id, word_id, payload)

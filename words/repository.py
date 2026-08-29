@@ -19,12 +19,13 @@ def get_vocabulary(
     db: Session,
     user_id: int,
     *,
+    language: str,
     query: str | None = None,
     page: int = 1,
     page_size: int = 5,
     sort_by: VocabularySortBy = VocabularySortBy.created_at,
 ) -> tuple[list[Word], int]:
-    q = db.query(Word).filter(Word.user_id == user_id)
+    q = db.query(Word).filter(Word.user_id == user_id, Word.language == language)
 
     if query:
         q = q.filter(Word.name.ilike(f"%{query}%"))
