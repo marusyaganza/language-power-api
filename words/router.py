@@ -1,13 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from core.database import get_db
-from words.service import save_word
+from words.service import save_word, get_vocabulary_page
 from words.repository import get_saved_uuids
-
-from words.schemas import WordOut, WordCreate
+from words.schemas import WordOut, WordCreate, VocabularyPage, VocabularySortBy
 from dictionary.providers import PROVIDERS
 from auth.dependencies import get_current_user
-
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -44,3 +42,15 @@ def create_word(
     current_user=Depends(get_current_user),
 ):
     return save_word(db, current_user.id, payload)
+
+@router.get("/words/vocabulary", response_model=VocabularyPage)
+def vocabulary(
+    query: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    sort_by: VocabularySortBy = Query(default=VocabularySortBy.created_at),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    return get_vocabulary_page(
+        db, current_user.id, query=query, page=page, sort_by=sort_by
+    )

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-
+from enum import Enum
 
 class ExampleCreate(BaseModel):
     text: str
@@ -41,3 +41,15 @@ class WordOut(BaseModel):
     saved: bool = False
 
     model_config = {"from_attributes": True}
+
+class VocabularySortBy(str, Enum):
+    created_at = "created_at"
+    name = "name"
+
+
+class VocabularyPage(BaseModel):
+    items: list[WordOut]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
