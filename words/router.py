@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, status
 from sqlalchemy.orm import Session
 from core.database import get_db
-from words.service import save_word, get_vocabulary_page
+from words.service import save_word, get_vocabulary_page, delete_word
 from words.repository import get_saved_uuids
 from words.schemas import WordOut, WordCreate, VocabularyPage, VocabularySortBy
 from dictionary.providers import PROVIDERS
@@ -54,3 +54,11 @@ def vocabulary(
     return get_vocabulary_page(
         db, current_user.id, query=query, page=page, sort_by=sort_by
     )
+
+@router.delete("/words/{word_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_word(
+    word_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    delete_word(db, current_user.id, word_id)

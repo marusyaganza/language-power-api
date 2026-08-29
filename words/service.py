@@ -56,3 +56,17 @@ def get_vocabulary_page(
         total=total,
         total_pages=ceil(total / page_size) if total else 0,
     )
+
+def delete_word(db: Session, user_id: int, word_id: int) -> None:
+    word = (
+        db.query(Word)
+        .filter(Word.id == word_id, Word.user_id == user_id)
+        .first()
+    )
+    if word is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Word not found",
+        )
+    db.delete(word)
+    db.commit()
