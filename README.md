@@ -9,5 +9,5 @@ docker stop redis-dev
 docker start redis-dev
 docker rm -f redis-dev
 docker compose up -d
-docker exec -it your-app-postgres-dev psql -U app_user -d language_app
+docker exec -it postgres-dev psql -U app_user -d language_app
 ```
