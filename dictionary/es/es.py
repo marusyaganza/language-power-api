@@ -2,14 +2,17 @@ from dictionary.helpers.mw import extract_examples
 from words.language import Language
 from dictionary.base import DictionaryProvider
 from words.word import Word
+from dictionary.base import SearchResult
 import httpx
 from settings import settings
-from dictionary.helpers.mw import format_name, extract_audio
+from dictionary.helpers.mw import format_name, extract_audio, is_suggestion_response
 
 class SpanishDictionaryProvider(DictionaryProvider):
     async def fetch(self, query: str) -> list[Word]:
-        raw_items = await self._fetch_raw(query)
-        return [self._format(item) for item in raw_items]
+       raw_items = await self._fetch_raw(query)
+       if is_suggestion_response(raw_items):
+        return SearchResult(suggestions=raw_items)
+       return SearchResult(words=[self._format(item) for item in raw_items])
     
     async def _fetch_raw(self, query: str) -> list[Word]:
         async with httpx.AsyncClient() as client:

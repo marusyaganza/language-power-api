@@ -58,3 +58,12 @@ def extract_transcription(word):
     if prs:
         transcription = prs[0].get('ipa', '')
     return transcription
+
+def is_suggestion_response(raw_items: list) -> bool:
+    """
+    MW-family APIs return a flat list of plain suggestion strings
+    (instead of entry objects) when the query doesn't match a
+    headword closely enough. This is specific to this API family,
+    not to any particular language.
+    """
+    return bool(raw_items) and all(isinstance(item, str) for item in raw_items)

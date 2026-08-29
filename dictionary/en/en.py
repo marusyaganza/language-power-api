@@ -1,14 +1,19 @@
 import httpx
 from words.language import Language
 from dictionary.base import DictionaryProvider
-from dictionary.helpers.mw import extract_examples, extract_audio, extract_transcription, format_name
+from dictionary.helpers.mw import extract_examples, extract_audio, extract_transcription, format_name, is_suggestion_response
 from words.word import Word
+from dictionary.base import SearchResult
 from settings import settings
 
 class EnglishDictionaryProvider(DictionaryProvider):
     async def fetch(self, query: str) -> list[Word]:
         raw_items = await self._fetch_raw(query)
-        return [self._format(item) for item in raw_items]
+
+        if is_suggestion_response(raw_items):
+            return SearchResult(suggestions=raw_items)
+
+        return SearchResult(words=[self._format(item) for item in raw_items])
     
     async def _fetch_raw(self, query: str) -> list[Word]:
         async with httpx.AsyncClient() as client:

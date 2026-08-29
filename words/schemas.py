@@ -64,3 +64,7 @@ class WordUpdate(BaseModel):
     examples: list[ExampleUpdate] | None = None
     audio_url: str | None = None
     img_url: str | None = None
+
+class WordSearchResponse(BaseModel):
+    words: list[WordOut]
+    suggestions: list[str] = []

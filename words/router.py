@@ -3,13 +3,14 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from words.service import save_word, get_vocabulary_page, delete_word, update_word
 from words.repository import get_saved_uuids
-from words.schemas import WordOut, WordCreate, VocabularyPage, VocabularySortBy, WordUpdate
+from words.schemas import WordOut, WordCreate, VocabularyPage, VocabularySortBy, WordUpdate, WordSearchResponse
 from dictionary.providers import PROVIDERS
 from auth.dependencies import get_current_user
+from dictionary.base import SearchResult
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
-@router.get("/words/search", response_model=list[WordOut])
+@router.get("/words/search", response_model=WordSearchResponse)
 async def search_word(
     query: str,
     language: str,
@@ -23,16 +24,17 @@ async def search_word(
 
     if not results:
         raise HTTPException(status_code=404, detail="Word not found")
-
-    uuids = [w.uuid for w in results if w.uuid]
+    if not results.words:
+        return results
+    
+    uuids = [w.uuid for w in results.words if w.uuid]
     saved_uuids = get_saved_uuids(db, current_user.id, uuids)
-
-    output = [
+    words = [
         WordOut.model_validate(w).model_copy(update={"saved": w.uuid in saved_uuids})
-        for w in results
+        for w in results.words
     ]
 
-    return output
+    return SearchResult(words=words)
 
 
 @router.post("/words/save", response_model=WordOut, status_code=201)
