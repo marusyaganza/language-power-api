@@ -5,7 +5,7 @@ from words.word import Word
 from dictionary.base import SearchResult
 import httpx
 from settings import settings
-from dictionary.helpers.mw import format_name, extract_audio, is_suggestion_response
+from dictionary.helpers.mw import format_name, extract_audio, is_suggestion_response, extract_gender
 
 class SpanishDictionaryProvider(DictionaryProvider):
     async def fetch(self, query: str) -> list[Word]:
@@ -30,4 +30,6 @@ class SpanishDictionaryProvider(DictionaryProvider):
         defs = word.get('shortdef', [])
         audio_url = extract_audio(word, language, 'me')
         examples = extract_examples(word)
-        return Word(name=name, language=language, uuid=uuid, stems=stems, fl=fl, defs=defs, audio_url = audio_url, examples = examples)
+        gender = extract_gender(fl)
+
+        return Word(name=name, language=language, uuid=uuid, stems=stems, fl=fl, defs=defs, audio_url = audio_url, examples = examples, gender = gender)

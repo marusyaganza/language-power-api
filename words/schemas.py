@@ -16,6 +16,7 @@ class WordCreate(BaseModel):
     audio_url: str | None = None
     transcription: str | None = None
     img_url: str | None = None
+    gender: str | None = None
     examples: list[ExampleCreate] = []
 
 
@@ -39,6 +40,7 @@ class WordOut(BaseModel):
     img_url: str | None
     examples: list[ExampleOut]
     saved: bool = False
+    gender: str | None = None
 
     model_config = {"from_attributes": True}
 

@@ -33,7 +33,7 @@ def extract_audio(word, language, countryCode):
     if audio begins with a number or punctuation (eg, "_"), the subdirectory should be "number",
     """
     prs = word.get('hwi').get('prs')
-    audio_url = ''
+    audio_url = None
     audio = ''
     if prs:
         audio = prs[0].get('sound').get('audio')
@@ -67,3 +67,13 @@ def is_suggestion_response(raw_items: list) -> bool:
     not to any particular language.
     """
     return bool(raw_items) and all(isinstance(item, str) for item in raw_items)
+
+def extract_gender(fl: str | None) -> str | None:
+    if fl is None:
+        return None
+    fl_lower = fl.lower()
+    if "feminine" in fl_lower:
+        return "feminine"
+    if "masculine" in fl_lower:
+        return "masculine"
+    return None

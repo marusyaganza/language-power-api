@@ -11,3 +11,19 @@ docker rm -f redis-dev
 docker compose up -d
 docker exec -it postgres-dev psql -U app_user -d language_app
 ```
+
+Seed games DB (run each time after changing `seed_data.py`):
+```
+python3 -m games.seed
+```
+
+```bash
+# generate a migration by diffing your models against the current DB schema
+alembic revision --autogenerate -m "add games and game_languages tables"
+
+# review the generated file in alembic/versions/ before applying —
+# autogenerate is good but not infallible (enums, JSONB defaults, etc. are worth a glance)
+
+# then apply it
+alembic upgrade head
+```

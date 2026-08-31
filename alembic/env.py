@@ -11,7 +11,9 @@ from settings import settings
 
 # import every module that defines models, so Base.metadata knows about them
 from users.models import User           # noqa: F401
-from words.models import Word, Example  # noqa: F401
+from words.models import Word, Example  
+from games.models import Game, GameLanguage
+# noqa: F401
 # add new model modules here as you create them (e.g. games.models, WordStatistic)
 
 config = context.config

@@ -3,7 +3,7 @@ from sqlalchemy import (
     Column, Integer, String, DateTime, ForeignKey, UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 
 from core.database import Base
@@ -34,6 +34,7 @@ class Word(Base):
     user = relationship("User", back_populates="words")
     examples = relationship("Example", back_populates="word", cascade="all, delete-orphan")
 
+    gender: Mapped[str | None] = mapped_column(nullable=True)  # "masculine" | "feminine" | None
 
 class Example(Base):
     __tablename__ = "word_examples"

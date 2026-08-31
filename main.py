@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from words.router import router as words_router
 from auth.router import auth_router
+from games.router import router as games_router
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -8,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 app.include_router(words_router)
 app.include_router(auth_router)
+app.include_router(games_router)
 
 app.add_middleware(
     CORSMiddleware,

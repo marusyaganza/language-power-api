@@ -1,6 +1,7 @@
 # words/service.py
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 from fastapi import HTTPException, status
 from math import ceil
 from words.repository import get_vocabulary
@@ -20,6 +21,7 @@ def save_word(db: Session, user_id: int, payload: WordCreate) -> Word:
         audio_url=payload.audio_url,
         transcription=payload.transcription,
         img_url=payload.img_url,
+        gender=payload.gender,
         examples=[
             Example(text=e.text, translation=e.translation)
             for e in payload.examples
@@ -102,3 +104,26 @@ def update_word(db: Session, user_id: int, word_id: int, payload: WordUpdate) ->
     db.commit()
     db.refresh(word)
     return word
+
+def count_saved_words(
+    session,
+    user_id: int,
+    language: str,
+    *,
+    requires_audio: bool = False,
+    requires_image: bool = False,
+    requires_gender: bool = False,
+) -> int:
+    query = select(func.count()).select_from(Word).where(
+        Word.user_id == user_id,
+        Word.language == language,
+    )
+    if requires_audio:
+        query = query.where(Word.audio_url.is_not(None))
+    if requires_image:
+        query = query.where(Word.img_url.is_not(None))
+    if requires_gender:
+        query = query.where(Word.gender.is_not(None))
+
+    return session.scalar(query) or 0
+
