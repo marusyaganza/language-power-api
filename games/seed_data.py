@@ -7,7 +7,7 @@ GAME_DEFINITIONS = [
         "order_num": 0,
         "all_languages": True,
         "languages": [],
-        "default_config": {"words_per_session": 10},
+        "default_config": {"words_per_session": 5},
     },
     {
         "slug": "lexi-sense",
@@ -17,7 +17,7 @@ GAME_DEFINITIONS = [
         "order_num": 1,
         "all_languages": True,
         "languages": [],
-        "default_config": {"words_per_session": 10},
+        "default_config": {"words_per_session": 5},
     },
     {
         "slug": "definify",
@@ -27,7 +27,7 @@ GAME_DEFINITIONS = [
         "order_num": 2,
         "all_languages": True,
         "languages": [],
-        "default_config": {"words_per_session": 10},
+        "default_config": {"words_per_session": 5},
     },
     {
         "slug": "word-recall",
@@ -37,7 +37,7 @@ GAME_DEFINITIONS = [
         "order_num": 3,
         "all_languages": True,
         "languages": [],
-        "default_config": {"words_per_session": 10},
+        "default_config": {"words_per_session": 5},
     },
     {
         "slug": "picture-word-blitz",
@@ -47,7 +47,7 @@ GAME_DEFINITIONS = [
         "order_num": 4,
         "all_languages": True,
         "languages": [],
-        "default_config": {"words_per_session": 10},
+        "default_config": {"words_per_session": 5},
     },
     {
         "slug": "gender-word-challenge",
@@ -57,6 +57,6 @@ GAME_DEFINITIONS = [
         "order_num": 7,
         "all_languages": False,
         "languages": ["es"],
-        "default_config": {"words_per_session": 10},
+        "default_config": {"words_per_session": 5},
     },
 ]

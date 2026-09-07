@@ -27,3 +27,13 @@ alembic revision --autogenerate -m "add games and game_languages tables"
 # then apply it
 alembic upgrade head
 ```
+
+Running DB locally for development (Postgres and Redis):
+```
+docker compose up
+```
+
+Connect to the DB:
+```
+docker exec -it postgres-dev psql -U app_user -d language_app
+```

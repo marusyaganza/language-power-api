@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 
 class ExampleCreate(BaseModel):
@@ -11,13 +11,21 @@ class WordCreate(BaseModel):
     name: str
     language: str
     stems: list[str] = []
-    defs: list[str] = []
+    defs: list[str] = Field(min_length=1)
     fl: str
     audio_url: str | None = None
     transcription: str | None = None
     img_url: str | None = None
     gender: str | None = None
     examples: list[ExampleCreate] = []
+
+    @field_validator("defs")
+    @classmethod
+    def defs_must_be_non_blank(cls, value: list[str]) -> list[str]:
+        cleaned = [d.strip() for d in value]
+        if any(not d for d in cleaned):
+            raise ValueError("Definitions cannot be empty or blank")
+        return cleaned
 
 
 class ExampleOut(BaseModel):
@@ -33,7 +41,7 @@ class WordOut(BaseModel):
     name: str
     language: str
     stems: list[str]
-    defs: list[str]
+    defs: list[str] = Field(min_length=1)
     fl: str
     audio_url: str | None
     transcription: str | None
@@ -62,10 +70,20 @@ class ExampleUpdate(BaseModel):
 
 
 class WordUpdate(BaseModel):
-    defs: list[str] | None = None
+    defs: list[str] | None = Field(default=None, min_length=1)
     examples: list[ExampleUpdate] | None = None
     audio_url: str | None = None
     img_url: str | None = None
+
+    @field_validator("defs")
+    @classmethod
+    def defs_must_be_non_blank(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return value
+        cleaned = [d.strip() for d in value]
+        if any(not d for d in cleaned):
+            raise ValueError("Definitions cannot be empty or blank")
+        return cleaned
 
 class WordSearchResponse(BaseModel):
     words: list[WordOut]

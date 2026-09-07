@@ -1,6 +1,6 @@
 # words/models.py
 from sqlalchemy import (
-    Column, Integer, String, DateTime, ForeignKey, UniqueConstraint
+    Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, CheckConstraint
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship, Mapped, mapped_column
@@ -14,6 +14,7 @@ class Word(Base):
     __tablename__ = "words"
     __table_args__ = (
         UniqueConstraint("user_id", "uuid", name="uq_user_word_uuid"),
+        CheckConstraint("array_length(defs, 1) IS NOT NULL", name="ck_words_defs_not_empty"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
