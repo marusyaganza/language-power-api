@@ -105,25 +105,27 @@ def update_word(db: Session, user_id: int, word_id: int, payload: WordUpdate) ->
     db.refresh(word)
     return word
 
-def count_saved_words(
-    session,
-    user_id: int,
-    language: str,
-    *,
-    requires_audio: bool = False,
-    requires_image: bool = False,
-    requires_gender: bool = False,
-) -> int:
-    query = select(func.count()).select_from(Word).where(
-        Word.user_id == user_id,
-        Word.language == language,
-    )
+def _apply_requirement_filters(query, *, requires_audio=False, requires_image=False,
+                                requires_gender=False, requires_defs=False):
     if requires_audio:
         query = query.where(Word.audio_url.is_not(None))
     if requires_image:
         query = query.where(Word.img_url.is_not(None))
     if requires_gender:
         query = query.where(Word.gender.is_not(None))
+        
+    return query
 
+def count_saved_words(session, user_id: int, language: str, **requirements) -> int:
+    query = select(func.count()).select_from(Word).where(
+        Word.user_id == user_id, Word.language == language
+    )
+    query = _apply_requirement_filters(query, **requirements)
     return session.scalar(query) or 0
+
+def get_words_for_session(session, user_id: int, language: str, limit: int, **requirements) -> list[Word]:
+    query = select(Word).where(Word.user_id == user_id, Word.language == language)
+    query = _apply_requirement_filters(query, **requirements)
+    query = query.order_by(func.random()).limit(limit)
+    return session.scalars(query).all()
 
