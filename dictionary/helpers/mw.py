@@ -23,7 +23,8 @@ def extract_examples(data):
 
 def _format_example(example):
     t = strip_mw_markup(example.get('t'))
-    tr = example.get('tr', '')
+    tr = example.get('tr', None)
+    print(Example(text=t, translation=tr))
     return Example(text=t, translation=tr)
 
 def extract_audio(word, language, countryCode): 
@@ -53,7 +54,7 @@ def format_name(str):
     return ''.join(c for c in str if c != ':' and not c.isnumeric())
 
 def extract_transcription(word):
-    transcription = ''
+    transcription = None
     prs = word.get('hwi').get('prs')
     if prs:
         transcription = prs[0].get('ipa', '')

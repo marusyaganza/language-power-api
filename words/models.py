@@ -43,6 +43,6 @@ class Example(Base):
     id = Column(Integer, primary_key=True, index=True)
     word_id = Column(Integer, ForeignKey("words.id", ondelete="CASCADE"), nullable=False, index=True)
     text = Column(String, nullable=False)
-    translation = Column(String, nullable=False)
+    translation = Column(String, nullable=True)
 
     word = relationship("Word", back_populates="examples")

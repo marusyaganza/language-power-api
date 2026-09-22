@@ -50,7 +50,7 @@ def start_word_recall_session(session, user_id: int, game, language: str) -> Gam
     questions = [
         QuestionOut(
             id=w.id,
-            question=w.defs[0],
+            question=w.defs[:3],
             additional_info=QuestionAdditionalInfo(
                 audio_url=w.audio_url,
                 img_url=w.img_url,

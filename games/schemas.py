@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from words.schemas import ExampleOut
+from words.schemas import ExampleItem
 
 class GameOut(BaseModel):
     id: int
@@ -16,13 +16,13 @@ class GameOut(BaseModel):
 class QuestionAdditionalInfo(BaseModel):
     audio_url: str | None = None
     img_url: str | None = None
-    examples: list[ExampleOut] | None = None
+    examples: list[ExampleItem] | None = None
 
     model_config = {"from_attributes": True}
 
 class QuestionOut(BaseModel):
     id: int
-    question: str
+    question: list[str]
     additional_info: QuestionAdditionalInfo
 
 class GameSessionOut(BaseModel):

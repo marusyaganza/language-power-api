@@ -15,7 +15,7 @@ class Word:
     examples: list[Example]
     gender: str | None
 
-    def __init__(self, *, name, defs, language, stems, uuid, fl, audio_url=None, transcription='', examples=[], img_url=None, gender=None):
+    def __init__(self, *, name, defs, language, stems, uuid, fl, audio_url=None, transcription=None, examples=[], img_url=None, gender=None):
         self.name = name
         self.stems = stems
         self.defs = defs

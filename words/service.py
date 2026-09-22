@@ -30,7 +30,8 @@ def save_word(db: Session, user_id: int, payload: WordCreate) -> Word:
     db.add(word)
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as e:
+# TODO: distinguish word exists from other errors
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

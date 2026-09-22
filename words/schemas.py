@@ -1,9 +1,18 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, BeforeValidator
+from typing import Annotated
 from enum import Enum
 
-class ExampleCreate(BaseModel):
+def _empty_str_to_none(value):
+    if isinstance(value, str) and value.strip() == "":
+        return None
+    return value
+
+OptionalStr = Annotated[str | None, BeforeValidator(_empty_str_to_none)]
+
+class ExampleItem(BaseModel):
     text: str
-    translation: str
+    translation: OptionalStr = None
+    model_config = {"from_attributes": True}
 
 
 class WordCreate(BaseModel):
@@ -13,11 +22,11 @@ class WordCreate(BaseModel):
     stems: list[str] = []
     defs: list[str] = Field(min_length=1)
     fl: str
-    audio_url: str | None = None
-    transcription: str | None = None
-    img_url: str | None = None
-    gender: str | None = None
-    examples: list[ExampleCreate] = []
+    audio_url: OptionalStr = None
+    transcription: OptionalStr = None
+    img_url: OptionalStr = None
+    gender: OptionalStr = None
+    examples: list[ExampleItem] = []
 
     @field_validator("defs")
     @classmethod
@@ -28,13 +37,6 @@ class WordCreate(BaseModel):
         return cleaned
 
 
-class ExampleOut(BaseModel):
-    text: str
-    translation: str
-
-    model_config = {"from_attributes": True}
-
-
 class WordOut(BaseModel):
     id: int | None = None
     uuid: str | None = None
@@ -43,10 +45,10 @@ class WordOut(BaseModel):
     stems: list[str]
     defs: list[str] = Field(min_length=1)
     fl: str
-    audio_url: str | None
-    transcription: str | None
-    img_url: str | None
-    examples: list[ExampleOut]
+    audio_url: OptionalStr
+    transcription: OptionalStr
+    img_url: OptionalStr
+    examples: list[ExampleItem]
     saved: bool = False
     gender: str | None = None
 
@@ -72,17 +74,15 @@ class ExampleUpdate(BaseModel):
 class WordUpdate(BaseModel):
     defs: list[str] | None = Field(default=None, min_length=1)
     examples: list[ExampleUpdate] | None = None
-    audio_url: str | None = None
-    img_url: str | None = None
+    audio_url: OptionalStr = None
+    img_url: OptionalStr = None
 
     @field_validator("defs")
     @classmethod
     def defs_must_be_non_blank(cls, value: list[str] | None) -> list[str] | None:
-        if value is None:
-            return value
-        cleaned = [d.strip() for d in value]
-        if any(not d for d in cleaned):
-            raise ValueError("Definitions cannot be empty or blank")
+        cleaned = [item.strip() for item in value if item and item.strip()]
+        if not cleaned:
+            raise ValueError("examples must contain at least one non-empty string")
         return cleaned
 
 class WordSearchResponse(BaseModel):
