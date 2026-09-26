@@ -34,6 +34,7 @@ class Word(Base):
 
     user = relationship("User", back_populates="words")
     examples = relationship("Example", back_populates="word", cascade="all, delete-orphan")
+    progress = relationship("WordProgress", back_populates="word", cascade="all, delete-orphan")
 
     gender: Mapped[str | None] = mapped_column(nullable=True)  # "masculine" | "feminine" | None
 

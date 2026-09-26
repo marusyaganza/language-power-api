@@ -1,6 +1,7 @@
 # py-lp
 
 run the server
+
 ```
 uvicorn main:app --reload
 source venv/bin/activate
@@ -13,6 +14,7 @@ docker exec -it postgres-dev psql -U app_user -d language_app
 ```
 
 Seed games DB (run each time after changing `seed_data.py`):
+
 ```
 python3 -m games.seed
 ```
@@ -29,11 +31,18 @@ alembic upgrade head
 ```
 
 Running DB locally for development (Postgres and Redis):
+
 ```
 docker compose up
 ```
 
 Connect to the DB:
+
 ```
 docker exec -it postgres-dev psql -U app_user -d language_app
 ```
+
+docker exec -it <your-redis-container-name> redis-cli
+
+> KEYS game_session:\*
+> GET game_session:<the-session-id-you're-testing-with>

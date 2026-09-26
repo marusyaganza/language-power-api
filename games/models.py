@@ -1,6 +1,6 @@
 # games/models.py
 import enum
-from sqlalchemy import ForeignKey, UniqueConstraint
+from sqlalchemy import ForeignKey, UniqueConstraint, Column, DateTime, Boolean, Integer, String, Float, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -32,3 +32,39 @@ class GameLanguage(Base):
     __tablename__ = "game_languages"
     game_id: Mapped[int] = mapped_column(ForeignKey("games.id"), primary_key=True)
     language: Mapped[str] = mapped_column(primary_key=True)
+
+# games/models.py
+class WordProgress(Base):
+    __tablename__ = "word_progress"
+    __table_args__ = (
+        UniqueConstraint("word_id", "game_type", name="uq_word_progress_word_game"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    word_id = Column(Integer, ForeignKey("words.id", ondelete="CASCADE"), nullable=False, index=True)
+    game_type = Column(String, nullable=False, index=True)
+
+    is_learning = Column(Boolean, nullable=False, default=True)
+    learning_step_index = Column(Integer, nullable=False, default=0)
+    interval_days = Column(Float, nullable=False, default=0.0)
+    consecutive_correct = Column(Integer, nullable=False, default=0)
+    lapses = Column(Integer, nullable=False, default=0)
+    next_review_date = Column(DateTime(timezone=True), nullable=False, index=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    word = relationship("Word", back_populates="progress")
+    review_logs = relationship("ReviewLog", back_populates="progress", cascade="all, delete-orphan")
+
+
+class ReviewLog(Base):
+    __tablename__ = "review_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    word_progress_id = Column(Integer, ForeignKey("word_progress.id", ondelete="CASCADE"), nullable=False, index=True)
+    grade = Column(String, nullable=False)  # AnswerGrade value directly — "wrong"/"close"/"correct"
+    interval_at_review = Column(Float, nullable=False)
+    answered_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    progress = relationship("WordProgress", back_populates="review_logs")

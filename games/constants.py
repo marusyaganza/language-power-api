@@ -7,6 +7,15 @@ GAME_TYPE_REQUIREMENTS = {
     "gender": {"requires_gender": True},
 }
 
+GAME_ANSWER_TYPES = {
+    "audio": "typed",
+    "select_def": "choice",
+    "select_word": "choice",
+    "type_word": "typed",
+    "image": "typed",
+    "gender": "choice",  # revisit once gender assignment is fixed
+}
+
 GAME_TASKS = {
     "audio": "Type the word that you've heard",
     "select_def": "Select a definition that means ",

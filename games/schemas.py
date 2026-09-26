@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from words.schemas import ExampleItem
+from games.scoring import AnswerGrade
 
 class GameOut(BaseModel):
     id: int
@@ -30,3 +31,15 @@ class GameSessionOut(BaseModel):
     session_id: str
     questions: list[QuestionOut]
     questions: list[QuestionOut]
+
+
+class AnswerRequest(BaseModel):
+    session_id: str
+    word_id: int
+    answer: str
+
+
+class AnswerResponse(BaseModel):
+    grade: AnswerGrade
+    correct_answer: str | None = None  # populated when grade != CORRECT
+    session_complete: bool
