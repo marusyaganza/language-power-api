@@ -6,9 +6,14 @@ expires `GAME_SESSION_TTL_SECONDS` after it is created, and answering does not
 extend that. Sessions are looked up by id; the stored `user_id` lets callers
 check that the session belongs to whoever is answering.
 
+A session is finished once every question is answered, or earlier when the
+player asks for the result (`finish_game_session`). A finished session is kept
+for `GAME_RESULT_TTL_SECONDS` from then on, so its result can still be read.
+
 Session data is a plain dict:
-`{"user_id": int, "game_id": int, "game_type": str, "questions": [{"word_id": int,
-"answer": str, "answered": bool (set once answered)}, ...]}`
+`{"user_id": int, "game_id": int, "game_type": str, "finished": bool (set once
+finished), "questions": [{"word_id": int, "answer": str, "grade": str (the
+AnswerGrade value, set once answered)}, ...]}`
 
 Updates are read-modify-write, so two simultaneous answers to the same session
 can overwrite each other's "answered" flag. A single player is not expected to
@@ -20,6 +25,7 @@ import uuid
 from core.redis import redis_client
 
 GAME_SESSION_TTL_SECONDS = 20 * 60
+GAME_RESULT_TTL_SECONDS = 60 * 60
 
 
 class GameSessionNotFound(Exception):
@@ -73,18 +79,46 @@ def get_question(session_data: dict, word_id: int) -> dict:
     return question
 
 
-async def mark_question_answered(session_id: str, session_data: dict, word_id: int) -> bool:
-    """Mark the question answered and return True if every question now is.
+def is_answered(question: dict) -> bool:
+    return "grade" in question
 
-    `session_data` is updated in place and saved back to Redis. The session's
-    remaining lifetime is kept, not reset.
+
+async def mark_question_answered(
+    session_id: str, session_data: dict, word_id: int, grade: str
+) -> bool:
+    """Record `grade` for the question and return True if every question is now answered.
+
+    `session_data` is updated in place and saved back to Redis. Answering the
+    last question finishes the session (see `finish_game_session`); otherwise
+    the session's remaining lifetime is kept, not reset.
     """
     for question in session_data["questions"]:
         if question["word_id"] == word_id:
-            question["answered"] = True
+            question["grade"] = grade
             break
 
+    complete = all(is_answered(q) for q in session_data["questions"])
+    if complete:
+        await finish_game_session(session_id, session_data)
+    else:
+        await redis_client.set(
+            _game_session_key(session_id), json.dumps(session_data), keepttl=True
+        )
+    return complete
+
+
+async def finish_game_session(session_id: str, session_data: dict) -> None:
+    """Mark the session finished and keep it for `GAME_RESULT_TTL_SECONDS`.
+
+    `session_data` is updated in place and saved back to Redis. Unanswered
+    questions stay unanswered. Does nothing if the session is already finished,
+    so reading a result repeatedly does not extend its lifetime.
+    """
+    if session_data.get("finished"):
+        return
+    session_data["finished"] = True
     await redis_client.set(
-        _game_session_key(session_id), json.dumps(session_data), keepttl=True
+        _game_session_key(session_id),
+        json.dumps(session_data),
+        ex=GAME_RESULT_TTL_SECONDS,
     )
-    return all(q.get("answered") for q in session_data["questions"])

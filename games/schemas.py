@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 from words.schemas import ExampleItem
 from games.scoring import AnswerGrade
@@ -43,3 +45,25 @@ class AnswerResponse(BaseModel):
     grade: AnswerGrade
     correct_answer: str | None = None  # populated when grade != CORRECT
     session_complete: bool
+
+
+class QuestionResult(BaseModel):
+    word_id: int
+    answer: str
+    grade: AnswerGrade | Literal["unanswered"]
+
+
+class GameResultOut(BaseModel):
+    """The result of a finished game session.
+
+    `score_percent` is (correct + close) / total_words, rounded half up;
+    unanswered questions count against it.
+    """
+
+    total_words: int
+    correct: int
+    close: int
+    wrong: int
+    unanswered: int
+    score_percent: int
+    questions: list[QuestionResult]

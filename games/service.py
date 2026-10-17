@@ -30,13 +30,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import AsyncSessionLocal
 from games.constants import GAME_ANSWER_TYPES, GAME_TASKS, GAME_TYPE_REQUIREMENTS
 from games.models import Game, GameLanguage, ReviewLog, WordProgress
-from games.schemas import GameOut, GameSessionOut, QuestionAdditionalInfo, QuestionOut
+from games.schemas import (
+    GameOut,
+    GameResultOut,
+    GameSessionOut,
+    QuestionAdditionalInfo,
+    QuestionOut,
+    QuestionResult,
+)
 from games.scoring import AnswerGrade, classify_choice_answer, classify_typed_answer
 from games.session_store import (
     GameSessionNotFound,
     create_game_session,
+    finish_game_session,
     get_game_session,
     get_question,
+    is_answered,
     mark_question_answered,
 )
 from games.spaced_repetition import (
@@ -55,10 +64,13 @@ __all__ = [
     "SessionNotFoundError",
     "SessionGameMismatchError",
     "QuestionNotFoundError",
+    "SessionFinishedError",
+    "QuestionAlreadyAnsweredError",
     "AnswerCheck",
     "list_games_for_language",
     "start_game_session",
     "check_answer",
+    "get_session_result",
     "persist_review_result",
 ]
 
@@ -95,6 +107,14 @@ class SessionGameMismatchError(GamesError):
 
 class QuestionNotFoundError(GamesError):
     """The game session has no question for the given word."""
+
+
+class SessionFinishedError(GamesError):
+    """The game session is finished and takes no more answers."""
+
+
+class QuestionAlreadyAnsweredError(GamesError):
+    """The question was already answered; only the first answer counts."""
 
 
 # --------------------------------------------------------------------------- #
@@ -228,35 +248,38 @@ async def check_answer(
     is not recorded until the caller passes the result to
     `persist_review_result`.
 
-    Only the user who started the session can answer it. Another user's
-    session is reported exactly like one that does not exist, so a leaked
-    session id reveals nothing.
+    Each question can be answered once: the response reveals the expected
+    answer, so a second attempt would let the player copy it.
 
     Raises:
         SessionNotFoundError: the session expired, never existed, or belongs
             to another user.
         SessionGameMismatchError: the session belongs to a different game.
+        SessionFinishedError: the session is already finished.
         QuestionNotFoundError: the session has no question for `word_id`.
+        QuestionAlreadyAnsweredError: the question was already answered.
     """
-    try:
-        session_data = await get_game_session(session_id)
-    except GameSessionNotFound as exc:
-        raise SessionNotFoundError("Session expired or not found") from exc
-
-    if session_data.get("user_id") != user_id:
-        raise SessionNotFoundError("Session expired or not found")
+    session_data = await _get_own_session(user_id, session_id)
 
     if session_data["game_id"] != game_id:
         raise SessionGameMismatchError("Session does not belong to this game")
+
+    if session_data.get("finished"):
+        raise SessionFinishedError("Session is already finished")
 
     try:
         question = get_question(session_data, word_id)
     except GameSessionNotFound as exc:
         raise QuestionNotFoundError("Question not found in session") from exc
 
+    if is_answered(question):
+        raise QuestionAlreadyAnsweredError("Question was already answered")
+
     game_type = session_data["game_type"]
     grade = _grade(game_type, answer, question["answer"])
-    session_complete = await mark_question_answered(session_id, session_data, word_id)
+    session_complete = await mark_question_answered(
+        session_id, session_data, word_id, grade.value
+    )
 
     return AnswerCheck(
         grade=grade,
@@ -271,6 +294,85 @@ def _grade(game_type: str, given: str, expected: str) -> AnswerGrade:
     if GAME_ANSWER_TYPES.get(game_type, "choice") == "typed":
         return classify_typed_answer(given, expected)
     return classify_choice_answer(given, expected)
+
+
+async def _get_own_session(user_id: int, session_id: str) -> dict:
+    """Load a game session that belongs to `user_id`.
+
+    Another user's session is reported exactly like one that does not exist,
+    so a leaked session id reveals nothing.
+
+    Raises:
+        SessionNotFoundError: the session expired, never existed, or belongs
+            to another user.
+    """
+    try:
+        session_data = await get_game_session(session_id)
+    except GameSessionNotFound as exc:
+        raise SessionNotFoundError("Session expired or not found") from exc
+
+    if session_data.get("user_id") != user_id:
+        raise SessionNotFoundError("Session expired or not found")
+    return session_data
+
+
+# --------------------------------------------------------------------------- #
+# Result
+# --------------------------------------------------------------------------- #
+
+async def get_session_result(user_id: int, session_id: str) -> GameResultOut:
+    """Finish the game session if it is still running and return its result.
+
+    Asking for the result ends the session early: questions not answered yet
+    stay unanswered, take no more answers, and never reach the learning
+    progress. They count against the score.
+
+    A close answer (a typo) counts as correct in `score_percent`; it is also
+    reported separately in `close`.
+
+    Raises:
+        SessionNotFoundError: the session expired, never existed, or belongs
+            to another user.
+    """
+    session_data = await _get_own_session(user_id, session_id)
+    await finish_game_session(session_id, session_data)
+    return _summarize(session_data["questions"])
+
+
+def _summarize(questions: list[dict]) -> GameResultOut:
+    results = [
+        QuestionResult(
+            word_id=q["word_id"],
+            answer=q["answer"],
+            grade=q.get("grade", "unanswered"),
+        )
+        for q in questions
+    ]
+    counts = {grade: 0 for grade in (*AnswerGrade, "unanswered")}
+    for result in results:
+        counts[result.grade] += 1
+
+    total = len(results)
+    passed = counts[AnswerGrade.CORRECT] + counts[AnswerGrade.CLOSE]
+    return GameResultOut(
+        total_words=total,
+        correct=counts[AnswerGrade.CORRECT],
+        close=counts[AnswerGrade.CLOSE],
+        wrong=counts[AnswerGrade.WRONG],
+        unanswered=counts["unanswered"],
+        score_percent=_percent_half_up(passed, total),
+        questions=results,
+    )
+
+
+def _percent_half_up(part: int, total: int) -> int:
+    """`part / total` as a whole percentage, rounding .5 up (1/8 -> 13, not 12).
+
+    Integer arithmetic, because `round()` rounds half to even.
+    """
+    if total == 0:
+        return 0
+    return (200 * part + total) // (2 * total)
 
 
 # --------------------------------------------------------------------------- #

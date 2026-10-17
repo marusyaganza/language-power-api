@@ -20,7 +20,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth.dependencies import get_current_user
 from core.database import get_db
 from games import service
-from games.schemas import AnswerRequest, AnswerResponse, GameOut, GameSessionOut
+from games.schemas import (
+    AnswerRequest,
+    AnswerResponse,
+    GameOut,
+    GameResultOut,
+    GameSessionOut,
+)
 
 router = APIRouter(prefix="/games", tags=["games"])
 
@@ -30,6 +36,8 @@ _STATUS_FOR_ERROR: dict[type[service.GamesError], int] = {
     service.SessionNotFoundError: status.HTTP_404_NOT_FOUND,
     service.SessionGameMismatchError: status.HTTP_400_BAD_REQUEST,
     service.QuestionNotFoundError: status.HTTP_404_NOT_FOUND,
+    service.SessionFinishedError: status.HTTP_409_CONFLICT,
+    service.QuestionAlreadyAnsweredError: status.HTTP_409_CONFLICT,
 }
 
 
@@ -84,8 +92,9 @@ async def submit_answer(
     """Grade an answer in a running game session.
 
     404 if the session expired, belongs to another user, or has no such
-    question, 400 if the session belongs to another game. The learning
-    progress is saved after the response has been sent.
+    question, 400 if the session belongs to another game, 409 if the session
+    is finished or the question was already answered. The learning progress
+    is saved after the response has been sent.
     """
     with _http_errors():
         check = await service.check_answer(
@@ -107,3 +116,15 @@ async def submit_answer(
         correct_answer=check.correct_answer,
         session_complete=check.session_complete,
     )
+
+
+# The path parameter is not called `session_id`: `get_current_user` already
+# reads the auth cookie under that name, and FastAPI cannot take both.
+@router.get("/result/{game_session_id}", response_model=GameResultOut)
+async def get_game_result(game_session_id: str, user=Depends(get_current_user)):
+    """Finish a game session (if still running) and return its result.
+
+    404 if the session expired or belongs to another user.
+    """
+    with _http_errors():
+        return await service.get_session_result(user.id, game_session_id)
