@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from words.schemas import ExampleItem
 from games.scoring import AnswerGrade
 
@@ -28,12 +28,13 @@ class QuestionAdditionalInfo(BaseModel):
     audio_url: str | None = None
     img_url: str | None = None
     examples: list[ExampleItem] | None = None
+    definition: str | None = Field(default=None, alias="def")
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 class QuestionOut(BaseModel):
     id: int
-    question: list[str]
+    question: list[str] | str  # definitions (type_word) or an audio URL (audio)
     additional_info: QuestionAdditionalInfo
 
 class GameSessionOut(BaseModel):

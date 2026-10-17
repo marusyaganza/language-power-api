@@ -23,6 +23,7 @@ Rules that apply to every function below:
 """
 import logging
 import random
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -56,6 +57,7 @@ from games.spaced_repetition import (
     initialize_progress,
     update_progress,
 )
+from words.models import Word
 from words.service import get_word_ids, get_words_by_ids
 
 logger = logging.getLogger(__name__)
@@ -77,8 +79,6 @@ __all__ = [
     "persist_review_result",
 ]
 
-# The only game type that can be played so far (the typed word-recall game).
-WORD_RECALL_GAME_TYPE = "type_word"
 DEFAULT_WORDS_PER_SESSION = 10
 # How many of a word's definitions are shown as clues in a question.
 MAX_DEFINITIONS_PER_QUESTION = 3
@@ -198,20 +198,58 @@ async def start_game_session(
     game = await db.get(Game, game_id)
     if game is None:
         raise GameNotFoundError("Game not found")
-    if game.game_type != WORD_RECALL_GAME_TYPE:
+    build_question = _QUESTION_BUILDERS.get(game.game_type)
+    if build_question is None:
         raise GameNotImplementedError("This game isn't implemented yet")
-    return await _start_word_recall_session(
-        db, user_id, game, language, mode, new_words_first
+    return await _start_session(
+        db, user_id, game, language, mode, new_words_first, build_question
     )
 
 
-async def _start_word_recall_session(
+def _word_recall_question(word: Word) -> QuestionOut:
+    """type_word: guess the word from its definitions."""
+    return QuestionOut(
+        id=word.id,
+        question=word.defs[:MAX_DEFINITIONS_PER_QUESTION],
+        additional_info=QuestionAdditionalInfo(
+            audio_url=word.audio_url,
+            img_url=word.img_url,
+            examples=word.examples or None,
+        ),
+    )
+
+
+def _audio_question(word: Word) -> QuestionOut:
+    """audio: type the word you hear. The audio is the question, so the hint
+    is the meaning instead."""
+    return QuestionOut(
+        id=word.id,
+        question=word.audio_url,
+        additional_info=QuestionAdditionalInfo(
+            img_url=word.img_url,
+            examples=word.examples or None,
+            definition=f"{word.name} means {word.defs[0]}",
+        ),
+    )
+
+
+# The game types that can be played, and how each turns a word into a
+# question. The answer is always the word's name; how it is graded is set by
+# GAME_ANSWER_TYPES (games.constants).
+_QUESTION_BUILDERS: dict[str, Callable[[Word], QuestionOut]] = {
+    "type_word": _word_recall_question,
+    "audio": _audio_question,
+}
+
+
+async def _start_session(
     db: AsyncSession,
     user_id: int,
     game: Game,
     language: str,
     mode: GameMode,
     new_words_first: bool,
+    build_question: Callable[[Word], QuestionOut],
 ) -> GameSessionOut:
     words_per_session = game.default_config.get(
         "words_per_session", DEFAULT_WORDS_PER_SESSION
@@ -227,20 +265,10 @@ async def _start_word_recall_session(
     answers = [{"word_id": w.id, "answer": w.name} for w in words]
     session_id = await create_game_session(user_id, game.id, game.game_type, answers)
 
-    questions = [
-        QuestionOut(
-            id=w.id,
-            question=w.defs[:MAX_DEFINITIONS_PER_QUESTION],
-            additional_info=QuestionAdditionalInfo(
-                audio_url=w.audio_url,
-                img_url=w.img_url,
-                examples=w.examples or None,
-            ),
-        )
-        for w in words
-    ]
     return GameSessionOut(
-        task=GAME_TASKS[game.game_type], session_id=session_id, questions=questions
+        task=GAME_TASKS[game.game_type],
+        session_id=session_id,
+        questions=[build_question(w) for w in words],
     )
 
 
