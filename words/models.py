@@ -13,6 +13,7 @@ class Word(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "uuid", name="uq_user_word_uuid"),
         CheckConstraint("array_length(defs, 1) IS NOT NULL", name="ck_words_defs_not_empty"),
+        CheckConstraint("gender IN ('masculine', 'feminine', 'both')", name="ck_words_gender"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -34,7 +35,7 @@ class Word(Base):
     examples = relationship("Example", back_populates="word", cascade="all, delete-orphan", lazy="raise")
     progress = relationship("WordProgress", back_populates="word", cascade="all, delete-orphan", lazy="raise")
 
-    gender: Mapped[str | None] = mapped_column(nullable=True)  # "masculine" | "feminine" | None
+    gender: Mapped[str | None] = mapped_column(nullable=True)  # "masculine" | "feminine" | "both" | None
 
 class Example(Base):
     __tablename__ = "word_examples"

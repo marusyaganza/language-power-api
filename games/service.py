@@ -44,7 +44,12 @@ from games.schemas import (
     QuestionOut,
     QuestionResult,
 )
-from games.scoring import AnswerGrade, classify_choice_answer, classify_typed_answer
+from games.scoring import (
+    AnswerGrade,
+    classify_choice_answer,
+    classify_gender_answer,
+    classify_typed_answer,
+)
 from games.session_store import (
     GameSessionNotFound,
     create_game_session,
@@ -85,6 +90,8 @@ __all__ = [
 DEFAULT_WORDS_PER_SESSION = 10
 # Options per question in the multiple-choice games, the answer included.
 DEFAULT_OPTIONS_PER_QUESTION = 4
+# The gender game's checkboxes; checking both answers "both".
+GENDER_OPTIONS = ["masculine", "feminine"]
 # How many of a word's definitions are shown as clues in a question.
 MAX_DEFINITIONS_PER_QUESTION = 3
 
@@ -287,12 +294,28 @@ def _select_word_question(word: Word, pool: list[Word], option_count: int) -> tu
     ), word.name
 
 
+def _gender_question(word: Word, pool: list[Word], option_count: int) -> tuple[QuestionOut, str]:
+    """gender: tick the noun's gender(s). The answer is "masculine",
+    "feminine" or "both"."""
+    return QuestionOut(
+        id=word.id,
+        question=word.name,
+        options=GENDER_OPTIONS,
+        additional_info=QuestionAdditionalInfo(
+            audio_url=word.audio_url,
+            img_url=word.img_url,
+            examples=word.examples or None,
+            definition=_meaning(word),
+        ),
+    ), word.gender
+
+
 def _meaning(word: Word) -> str:
     return f"{word.name} means {word.defs[0]}"
 
 
 # Turns a word into a question and the answer the session store expects back.
-# `pool` is every word the game can use (empty unless the game has options).
+# `pool` is every word the game can use (empty unless `options_from_pool`).
 _BuildQuestion = Callable[[Word, list[Word], int], tuple[QuestionOut, str]]
 
 
@@ -304,7 +327,7 @@ def _typed(build: Callable[[Word], QuestionOut]) -> _BuildQuestion:
 @dataclass(frozen=True)
 class _GameSpec:
     build: _BuildQuestion
-    has_options: bool = False
+    options_from_pool: bool = False
 
 
 # The game types that can be played. How answers are graded is set by
@@ -313,8 +336,9 @@ _GAME_SPECS: dict[str, _GameSpec] = {
     "type_word": _GameSpec(_typed(_word_recall_question)),
     "audio": _GameSpec(_typed(_audio_question)),
     "image": _GameSpec(_typed(_image_question)),
-    "select_def": _GameSpec(_select_def_question, has_options=True),
-    "select_word": _GameSpec(_select_word_question, has_options=True),
+    "select_def": _GameSpec(_select_def_question, options_from_pool=True),
+    "select_word": _GameSpec(_select_word_question, options_from_pool=True),
+    "gender": _GameSpec(_gender_question),
 }
 
 
@@ -323,9 +347,9 @@ def _option_count(game: Game) -> int:
 
 
 def _min_word_count(game: Game) -> int:
-    """A game with options needs a word for each option; any other needs one word."""
+    """A game whose options are other words needs a word per option; any other needs one."""
     spec = _GAME_SPECS.get(game.game_type)
-    return _option_count(game) if spec and spec.has_options else 1
+    return _option_count(game) if spec and spec.options_from_pool else 1
 
 
 async def _start_session(
@@ -341,7 +365,7 @@ async def _start_session(
         "words_per_session", DEFAULT_WORDS_PER_SESSION
     )
     schedules = await _load_schedules(db, user_id, language, game.game_type)
-    if spec.has_options and len(schedules) < _min_word_count(game):
+    if spec.options_from_pool and len(schedules) < _min_word_count(game):
         raise NotEnoughWordsError(
             f"This game needs at least {_min_word_count(game)} words"
         )
@@ -349,7 +373,7 @@ async def _start_session(
         schedules, mode, new_words_first, datetime.now(UTC), words_per_session
     )
 
-    if spec.has_options:
+    if spec.options_from_pool:
         # The options come from all the words the game can use.
         pool = await get_words_by_ids(db, user_id, [s.word_id for s in schedules])
         by_id = {w.id: w for w in pool}
@@ -511,8 +535,11 @@ async def check_answer(
 
 def _grade(game_type: str, given: str, expected: str) -> AnswerGrade:
     """Grade an answer by the way this game type collects answers."""
-    if GAME_ANSWER_TYPES.get(game_type, "choice") == "typed":
+    answer_type = GAME_ANSWER_TYPES.get(game_type, "choice")
+    if answer_type == "typed":
         return classify_typed_answer(given, expected)
+    if answer_type == "gender":
+        return classify_gender_answer(given, expected)
     return classify_choice_answer(given, expected)
 
 

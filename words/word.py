@@ -30,7 +30,7 @@ class Word:
     transcription:str
     img_url: str | None
     examples: list[Example]
-    gender: str | None
+    gender: str | None  # "masculine" | "feminine" | "both" | None
 
     def __init__(self, *, name, defs, language, stems, uuid, fl, audio_url=None, transcription=None, examples=[], img_url=None, gender=None):
         self.name = name

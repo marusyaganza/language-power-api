@@ -13,7 +13,7 @@ GAME_ANSWER_TYPES = {
     "select_word": "choice",
     "type_word": "typed",
     "image": "typed",
-    "gender": "choice",  # revisit once gender assignment is fixed
+    "gender": "gender",  # "masculine" / "feminine" / "both", with partial credit
 }
 
 GAME_TASKS = {

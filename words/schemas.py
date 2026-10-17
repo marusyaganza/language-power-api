@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator, BeforeValidator
-from typing import Annotated
+from typing import Annotated, Literal
 from enum import Enum
 
 from words.word import unique_definitions
@@ -10,6 +10,9 @@ def _empty_str_to_none(value):
     return value
 
 OptionalStr = Annotated[str | None, BeforeValidator(_empty_str_to_none)]
+# "both": the noun takes either gender (el/la ecologista).
+Gender = Literal["masculine", "feminine", "both"]
+OptionalGender = Annotated[Gender | None, BeforeValidator(_empty_str_to_none)]
 
 class ExampleItem(BaseModel):
     text: str
@@ -27,7 +30,7 @@ class WordCreate(BaseModel):
     audio_url: OptionalStr = None
     transcription: OptionalStr = None
     img_url: OptionalStr = None
-    gender: OptionalStr = None
+    gender: OptionalGender = None
     examples: list[ExampleItem] = []
 
     @field_validator("defs")
@@ -52,7 +55,7 @@ class WordOut(BaseModel):
     img_url: OptionalStr
     examples: list[ExampleItem]
     saved: bool = False
-    gender: str | None = None
+    gender: Gender | None = None
 
     model_config = {"from_attributes": True}
 

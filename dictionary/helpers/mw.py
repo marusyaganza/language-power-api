@@ -73,8 +73,11 @@ def extract_gender(fl: str | None) -> str | None:
     if fl is None:
         return None
     fl_lower = fl.lower()
-    if "feminine" in fl_lower:
+    masculine, feminine = "masculine" in fl_lower, "feminine" in fl_lower
+    if masculine and feminine:  # e.g. "masculine or feminine noun" (el/la ecologista)
+        return "both"
+    if feminine:
         return "feminine"
-    if "masculine" in fl_lower:
+    if masculine:
         return "masculine"
     return None
