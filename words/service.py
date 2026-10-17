@@ -20,7 +20,7 @@ Rules that apply to every function below:
 """
 from math import ceil
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -49,8 +49,8 @@ __all__ = [
     "update_word",
     "delete_word",
     "get_vocabulary_page",
-    "get_random_words",
-    "count_words",
+    "get_word_ids",
+    "get_words_by_ids",
 ]
 
 VOCABULARY_PAGE_SIZE = 10
@@ -236,62 +236,42 @@ async def get_vocabulary_page(
     )
 
 
-async def get_random_words(
+async def get_word_ids(
     db: AsyncSession,
     user_id: int,
     language: str,
-    limit: int,
     *,
     requires_audio: bool = False,
     requires_image: bool = False,
     requires_gender: bool = False,
-) -> list[Word]:
-    """Pick up to `limit` of the user's saved words in `language`, at random.
+) -> list[int]:
+    """Return the ids of the user's saved words in `language`, in no particular order.
 
-    Each `requires_*` flag, when True, restricts the pool to words that have
+    Each `requires_*` flag, when True, restricts the result to words that have
     that field filled in: an audio URL, an image URL, or a grammatical gender.
     Flags that are False do not exclude anything.
-
-    Returns fewer than `limit` words when fewer match. Use `count_words` with
-    the same arguments to find out beforehand.
     """
-    query = (
-        select(Word)
-        .options(selectinload(Word.examples))
-        .where(Word.user_id == user_id, Word.language == language)
-    )
+    query = select(Word.id).where(Word.user_id == user_id, Word.language == language)
     query = _require_fields(
         query, requires_audio=requires_audio, requires_image=requires_image, requires_gender=requires_gender
     )
-    # random() sorts every matching row, which is fine for a personal
-    # vocabulary. Revisit if lists grow to tens of thousands of words.
-    query = query.order_by(func.random()).limit(limit)
     result = await db.scalars(query)
     return list(result.all())
 
 
-async def count_words(
-    db: AsyncSession,
-    user_id: int,
-    language: str,
-    *,
-    requires_audio: bool = False,
-    requires_image: bool = False,
-    requires_gender: bool = False,
-) -> int:
-    """Count the user's saved words in `language` that match the filters.
+async def get_words_by_ids(db: AsyncSession, user_id: int, word_ids: list[int]) -> list[Word]:
+    """Load the user's saved words with these ids, in no particular order.
 
-    The flags mean the same as in `get_random_words`.
+    Ids that do not exist or belong to another user are skipped.
     """
-    query = (
-        select(func.count())
-        .select_from(Word)
-        .where(Word.user_id == user_id, Word.language == language)
+    if not word_ids:
+        return []
+    result = await db.scalars(
+        select(Word)
+        .options(selectinload(Word.examples))
+        .where(Word.user_id == user_id, Word.id.in_(word_ids))
     )
-    query = _require_fields(
-        query, requires_audio=requires_audio, requires_image=requires_image, requires_gender=requires_gender
-    )
-    return await db.scalar(query) or 0
+    return list(result.all())
 
 
 # --------------------------------------------------------------------------- #

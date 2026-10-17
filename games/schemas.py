@@ -1,8 +1,15 @@
+from datetime import datetime
+from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel
 from words.schemas import ExampleItem
 from games.scoring import AnswerGrade
+
+class GameMode(str, Enum):
+    SPACED = "spaced"  # only words that are due
+    REVIEW = "review"  # every word, least recently practiced first
+
 
 class GameOut(BaseModel):
     id: int
@@ -10,8 +17,9 @@ class GameOut(BaseModel):
     title: str
     description: str
     game_type: str
-    available_word_count: int
-    is_enabled: bool
+    total_word_count: int
+    due_word_count: int  # includes words never practiced in this game
+    next_due_at: datetime | None  # earliest due date of words not due yet
 
     class Config:
         from_attributes = True

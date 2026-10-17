@@ -50,6 +50,8 @@ class WordProgress(Base):
     consecutive_correct = Column(Integer, nullable=False, default=0)
     lapses = Column(Integer, nullable=False, default=0)
     next_review_date = Column(DateTime(timezone=True), nullable=False, index=True)
+    # Set on every answer, including ones that do not change the schedule.
+    last_reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

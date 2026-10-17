@@ -23,6 +23,7 @@ from games import service
 from games.schemas import (
     AnswerRequest,
     AnswerResponse,
+    GameMode,
     GameOut,
     GameResultOut,
     GameSessionOut,
@@ -63,7 +64,7 @@ async def list_games(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List the games offered for a language, with how many saved words each can use."""
+    """List the games offered for a language, with how many saved words each can use and how many are due."""
     return await service.list_games_for_language(db, user.id, language)
 
 
@@ -71,15 +72,22 @@ async def list_games(
 async def start_game_session(
     game_id: int,
     language: str = Query(...),
+    mode: GameMode = Query(GameMode.SPACED),
+    new_words_first: bool = Query(False),
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Start a game session with questions drawn from the user's saved words.
 
+    `mode=spaced` uses only due words, `mode=review` every word.
+    `new_words_first` puts words never practiced in this game ahead of the rest.
+
     404 if the game does not exist, 501 if its type cannot be played yet.
     """
     with _http_errors():
-        return await service.start_game_session(db, user.id, game_id, language)
+        return await service.start_game_session(
+            db, user.id, game_id, language, mode, new_words_first
+        )
 
 
 @router.post("/{game_id}/answer", response_model=AnswerResponse)

@@ -1,6 +1,6 @@
 # games/spaced_repetition.py
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from games.scoring import AnswerGrade
 
@@ -8,6 +8,8 @@ from games.scoring import AnswerGrade
 @dataclass
 class SpacedRepetitionConfig:
     learning_steps_minutes: list[int] = field(default_factory=lambda: [15, 1440, 8640])  # 15m, 1d, 6d
+    # Never shorter than the last learning step: graduating must not bring
+    # the next review closer than the step the word just passed.
     graduating_interval_days: float = 1.0
     interval_growth_factor: float = 2.0       # multiplier on a correct answer
     close_growth_factor: float = 1.2          # smaller multiplier on a near-miss
@@ -22,6 +24,11 @@ class SpacedRepetitionConfig:
 
 
 DEFAULT_CONFIG = SpacedRepetitionConfig()
+
+
+def _graduating_interval_days(config: SpacedRepetitionConfig) -> float:
+    last_step_days = config.learning_steps_minutes[-1] / (24 * 60)
+    return max(config.graduating_interval_days, last_step_days)
 
 
 @dataclass
@@ -41,7 +48,7 @@ def initialize_progress() -> WordProgressState:
         interval_days=0.0,
         consecutive_correct=0,
         lapses=0,
-        next_review_date=datetime.utcnow(),
+        next_review_date=datetime.now(UTC),
     )
 
 
@@ -50,7 +57,7 @@ def update_progress(
     grade: AnswerGrade,
     config: SpacedRepetitionConfig = DEFAULT_CONFIG,
 ) -> WordProgressState:
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
 
     if state.is_learning:
         if grade == AnswerGrade.WRONG:
@@ -70,7 +77,7 @@ def update_progress(
                 )
             else:
                 state.is_learning = False
-                state.interval_days = config.graduating_interval_days
+                state.interval_days = _graduating_interval_days(config)
                 state.consecutive_correct = 1
                 state.next_review_date = now + timedelta(days=state.interval_days)
     else:

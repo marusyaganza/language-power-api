@@ -16,13 +16,15 @@ Rules that apply to every function below:
 * Games read words only through `words.service`, never from the `Word` table.
   `words` knows nothing about games; the words a game needs are described by
   `GAME_TYPE_REQUIREMENTS` (games.constants), whose keys must match the
-  `requires_*` keyword arguments of `words.service.get_random_words`.
+  `requires_*` keyword arguments of `words.service.get_word_ids`.
 * Failures are raised as subclasses of `GamesError`. This module knows nothing
   about HTTP; the router decides how each error is presented.
 * `db` must be an `AsyncSession`.
 """
 import logging
+import random
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,6 +33,7 @@ from core.database import AsyncSessionLocal
 from games.constants import GAME_ANSWER_TYPES, GAME_TASKS, GAME_TYPE_REQUIREMENTS
 from games.models import Game, GameLanguage, ReviewLog, WordProgress
 from games.schemas import (
+    GameMode,
     GameOut,
     GameResultOut,
     GameSessionOut,
@@ -53,7 +56,7 @@ from games.spaced_repetition import (
     initialize_progress,
     update_progress,
 )
-from words.service import count_words, get_random_words
+from words.service import get_word_ids, get_words_by_ids
 
 logger = logging.getLogger(__name__)
 
@@ -127,9 +130,10 @@ async def list_games_for_language(
     """List the games offered for `language`, in display order (`Game.order_num`).
 
     A game is offered if it is marked for all languages or is linked to
-    `language`. `available_word_count` is how many of the user's saved words
-    meet the game's requirements, and `is_enabled` is True when at least one
-    does.
+    `language`. The word counts cover the user's saved words that meet the
+    game's requirements; a word is due if it was never practiced in this game
+    type or its review date has come. `next_due_at` is the earliest review
+    date among the words that are not due yet (None if there are none).
     """
     games = await db.scalars(
         select(Game)
@@ -144,10 +148,11 @@ async def list_games_for_language(
         .order_by(Game.order_num)
     )
 
+    now = datetime.now(UTC)
     result = []
     for game in games.all():
-        requirements = GAME_TYPE_REQUIREMENTS.get(game.game_type, {})
-        word_count = await count_words(db, user_id, language, **requirements)
+        schedules = await _load_schedules(db, user_id, language, game.game_type)
+        upcoming = [s.next_review_date for s in schedules if not s.is_due(now)]
         result.append(
             GameOut(
                 id=game.id,
@@ -155,20 +160,31 @@ async def list_games_for_language(
                 title=game.title,
                 description=game.description,
                 game_type=game.game_type,
-                available_word_count=word_count,
-                is_enabled=word_count > 0,
+                total_word_count=len(schedules),
+                due_word_count=len(schedules) - len(upcoming),
+                next_due_at=min(upcoming, default=None),
             )
         )
     return result
 
 
 async def start_game_session(
-    db: AsyncSession, user_id: int, game_id: int, language: str
+    db: AsyncSession,
+    user_id: int,
+    game_id: int,
+    language: str,
+    mode: GameMode = GameMode.SPACED,
+    new_words_first: bool = False,
 ) -> GameSessionOut:
-    """Start a game session of random questions from the user's saved words.
+    """Start a game session with questions from the user's saved words.
+
+    In `GameMode.SPACED` only due words are used, most overdue first; in
+    `GameMode.REVIEW` every word is, least recently practiced first. Words
+    never practiced in this game type go last, or first if `new_words_first`,
+    in random order. The chosen words are asked in random order.
 
     The number of questions is the game's `words_per_session` setting. If the
-    user has fewer matching words than that, the session has fewer questions
+    user has fewer eligible words than that, the session has fewer questions
     (possibly none); use `list_games_for_language` to find out beforehand.
 
     The session's expected answers are kept in the session store and are not
@@ -184,19 +200,28 @@ async def start_game_session(
         raise GameNotFoundError("Game not found")
     if game.game_type != WORD_RECALL_GAME_TYPE:
         raise GameNotImplementedError("This game isn't implemented yet")
-    return await _start_word_recall_session(db, user_id, game, language)
+    return await _start_word_recall_session(
+        db, user_id, game, language, mode, new_words_first
+    )
 
 
 async def _start_word_recall_session(
-    db: AsyncSession, user_id: int, game: Game, language: str
+    db: AsyncSession,
+    user_id: int,
+    game: Game,
+    language: str,
+    mode: GameMode,
+    new_words_first: bool,
 ) -> GameSessionOut:
     words_per_session = game.default_config.get(
         "words_per_session", DEFAULT_WORDS_PER_SESSION
     )
-    requirements = GAME_TYPE_REQUIREMENTS.get(game.game_type, {})
-    words = await get_random_words(
-        db, user_id, language, words_per_session, **requirements
+    schedules = await _load_schedules(db, user_id, language, game.game_type)
+    word_ids = _pick_word_ids(
+        schedules, mode, new_words_first, datetime.now(UTC), words_per_session
     )
+    words = await get_words_by_ids(db, user_id, word_ids)
+    random.shuffle(words)
 
     # Expected answers go to the session store only; the client gets clues.
     answers = [{"word_id": w.id, "answer": w.name} for w in words]
@@ -217,6 +242,73 @@ async def _start_word_recall_session(
     return GameSessionOut(
         task=GAME_TASKS[game.game_type], session_id=session_id, questions=questions
     )
+
+
+@dataclass(frozen=True)
+class _WordSchedule:
+    """When a word is due in one game type. Both dates are None if never practiced."""
+
+    word_id: int
+    next_review_date: datetime | None
+    last_reviewed_at: datetime | None
+
+    @property
+    def is_new(self) -> bool:
+        return self.next_review_date is None
+
+    def is_due(self, now: datetime) -> bool:
+        return self.is_new or self.next_review_date <= now
+
+
+async def _load_schedules(
+    db: AsyncSession, user_id: int, language: str, game_type: str
+) -> list[_WordSchedule]:
+    """The schedule of every saved word in `language` that this game type can use."""
+    requirements = GAME_TYPE_REQUIREMENTS.get(game_type, {})
+    word_ids = await get_word_ids(db, user_id, language, **requirements)
+    if not word_ids:
+        return []
+    # One bound parameter per id; fine for a personal vocabulary, but
+    # Postgres caps a statement at 65535 parameters.
+    rows = await db.execute(
+        select(
+            WordProgress.word_id,
+            WordProgress.next_review_date,
+            WordProgress.last_reviewed_at,
+        ).where(
+            WordProgress.game_type == game_type,
+            WordProgress.word_id.in_(word_ids),
+        )
+    )
+    dates = {row.word_id: (row.next_review_date, row.last_reviewed_at) for row in rows}
+    return [_WordSchedule(word_id, *dates.get(word_id, (None, None))) for word_id in word_ids]
+
+
+# Sorts rows without `last_reviewed_at` (none are expected) as the oldest.
+_NEVER = datetime.min.replace(tzinfo=UTC)
+
+
+def _pick_word_ids(
+    schedules: list[_WordSchedule],
+    mode: GameMode,
+    new_words_first: bool,
+    now: datetime,
+    limit: int,
+) -> list[int]:
+    """Choose up to `limit` words for a session; see `start_game_session` for the order."""
+    new = [s for s in schedules if s.is_new]
+    random.shuffle(new)  # otherwise the same new words would come up every time
+
+    practiced = [s for s in schedules if not s.is_new]
+    if mode == GameMode.SPACED:
+        practiced = sorted(
+            (s for s in practiced if s.is_due(now)), key=lambda s: s.next_review_date
+        )
+    else:
+        practiced = sorted(practiced, key=lambda s: s.last_reviewed_at or _NEVER)
+
+    ordered = new + practiced if new_words_first else practiced + new
+    return [s.word_id for s in ordered[:limit]]
 
 
 # --------------------------------------------------------------------------- #
@@ -382,9 +474,13 @@ def _percent_half_up(part: int, total: int) -> int:
 async def persist_review_result(
     word_id: int, game_type: str, grade: AnswerGrade
 ) -> None:
-    """Update the spaced-repetition progress for a word and log the review.
+    """Log a review of a word and, if the word was due, update its schedule.
 
-    Progress is kept per (word, game type) and is created on the first review.
+    Progress is kept per (word, game type) and is created on the first review;
+    a word never reviewed is due. Answering a word that is not due yet (only
+    possible in review mode) is logged and moves `last_reviewed_at`, but leaves
+    the schedule alone, so extra practice cannot push a word into the future.
+
     Intended to run as a background task after the answer has been returned,
     so it opens its own database session (the request's is already closed).
     Failures are logged and swallowed, because the user has already received
@@ -400,21 +496,26 @@ async def persist_review_result(
                     WordProgress.game_type == game_type,
                 )
             )
+            now = datetime.now(UTC)
             if progress is None:
                 progress = WordProgress(word_id=word_id, game_type=game_type)
                 _write_state(progress, initialize_progress())
                 db.add(progress)
                 await db.flush()  # assigns progress.id for the ReviewLog FK below
+                is_due = True
+            else:
+                is_due = progress.next_review_date <= now
 
-            _write_state(progress, update_progress(_read_state(progress), grade))
+            interval_at_review = progress.interval_days
+            if is_due:
+                _write_state(progress, update_progress(_read_state(progress), grade))
+            progress.last_reviewed_at = now
 
-            # TODO: this logs the interval *after* the update. If the column
-            # means "interval when the review happened", log the old one.
             db.add(
                 ReviewLog(
                     progress=progress,
                     grade=grade.value,
-                    interval_at_review=progress.interval_days,
+                    interval_at_review=interval_at_review,
                 )
             )
             await db.commit()
