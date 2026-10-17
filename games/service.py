@@ -228,9 +228,27 @@ def _audio_question(word: Word) -> QuestionOut:
         additional_info=QuestionAdditionalInfo(
             img_url=word.img_url,
             examples=word.examples or None,
-            definition=f"{word.name} means {word.defs[0]}",
+            definition=_meaning(word),
         ),
     )
+
+
+def _image_question(word: Word) -> QuestionOut:
+    """image: type the name of what the picture shows. The picture is the
+    question, so the hints are the meaning and the pronunciation."""
+    return QuestionOut(
+        id=word.id,
+        question=word.img_url,
+        additional_info=QuestionAdditionalInfo(
+            audio_url=word.audio_url,
+            examples=word.examples or None,
+            definition=_meaning(word),
+        ),
+    )
+
+
+def _meaning(word: Word) -> str:
+    return f"{word.name} means {word.defs[0]}"
 
 
 # The game types that can be played, and how each turns a word into a
@@ -239,6 +257,7 @@ def _audio_question(word: Word) -> QuestionOut:
 _QUESTION_BUILDERS: dict[str, Callable[[Word], QuestionOut]] = {
     "type_word": _word_recall_question,
     "audio": _audio_question,
+    "image": _image_question,
 }
 
 

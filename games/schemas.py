@@ -34,7 +34,7 @@ class QuestionAdditionalInfo(BaseModel):
 
 class QuestionOut(BaseModel):
     id: int
-    question: list[str] | str  # definitions (type_word) or an audio URL (audio)
+    question: list[str] | str  # definitions (type_word), or an audio (audio) or image (image) URL
     additional_info: QuestionAdditionalInfo
 
 class GameSessionOut(BaseModel):
