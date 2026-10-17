@@ -39,6 +39,7 @@ _STATUS_FOR_ERROR: dict[type[service.GamesError], int] = {
     service.QuestionNotFoundError: status.HTTP_404_NOT_FOUND,
     service.SessionFinishedError: status.HTTP_409_CONFLICT,
     service.QuestionAlreadyAnsweredError: status.HTTP_409_CONFLICT,
+    service.NotEnoughWordsError: status.HTTP_409_CONFLICT,
 }
 
 
@@ -82,7 +83,8 @@ async def start_game_session(
     `mode=spaced` uses only due words, `mode=review` every word.
     `new_words_first` puts words never practiced in this game ahead of the rest.
 
-    404 if the game does not exist, 501 if its type cannot be played yet.
+    404 if the game does not exist, 501 if its type cannot be played yet,
+    409 if the user has fewer words than the game's `min_word_count`.
     """
     with _http_errors():
         return await service.start_game_session(

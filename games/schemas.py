@@ -20,6 +20,7 @@ class GameOut(BaseModel):
     total_word_count: int
     due_word_count: int  # includes words never practiced in this game
     next_due_at: datetime | None  # earliest due date of words not due yet
+    min_word_count: int  # words needed to start the game
 
     class Config:
         from_attributes = True
@@ -34,13 +35,15 @@ class QuestionAdditionalInfo(BaseModel):
 
 class QuestionOut(BaseModel):
     id: int
-    question: list[str] | str  # definitions (type_word), or an audio (audio) or image (image) URL
+    # A word (select_def), definitions (type_word, select_word), or an audio
+    # (audio) or image (image) URL.
+    question: list[str] | str
+    options: list[str] | None = None  # multiple-choice games only
     additional_info: QuestionAdditionalInfo
 
 class GameSessionOut(BaseModel):
     task: str
     session_id: str
-    questions: list[QuestionOut]
     questions: list[QuestionOut]
 
 

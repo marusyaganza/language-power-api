@@ -1,7 +1,7 @@
 from dictionary.helpers.mw import extract_examples
 from words.language import Language
 from dictionary.base import DictionaryProvider
-from words.word import Word
+from words.word import Word, unique_definitions
 from dictionary.base import SearchResult
 import httpx
 from settings import settings
@@ -27,7 +27,7 @@ class SpanishDictionaryProvider(DictionaryProvider):
         uuid = meta['uuid']
         stems =  meta['stems']
         fl = word['fl']
-        defs = word.get('shortdef', [])
+        defs = unique_definitions(word.get('shortdef', []))
         audio_url = extract_audio(word, language, 'me')
         examples = extract_examples(word)
         gender = extract_gender(fl)

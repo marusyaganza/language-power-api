@@ -32,6 +32,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import AsyncSessionLocal
 from games.constants import GAME_ANSWER_TYPES, GAME_TASKS, GAME_TYPE_REQUIREMENTS
+from games.hints import hidden_definitions
+from games.options import definition_options, word_options
 from games.models import Game, GameLanguage, ReviewLog, WordProgress
 from games.schemas import (
     GameMode,
@@ -71,6 +73,7 @@ __all__ = [
     "QuestionNotFoundError",
     "SessionFinishedError",
     "QuestionAlreadyAnsweredError",
+    "NotEnoughWordsError",
     "AnswerCheck",
     "list_games_for_language",
     "start_game_session",
@@ -80,6 +83,8 @@ __all__ = [
 ]
 
 DEFAULT_WORDS_PER_SESSION = 10
+# Options per question in the multiple-choice games, the answer included.
+DEFAULT_OPTIONS_PER_QUESTION = 4
 # How many of a word's definitions are shown as clues in a question.
 MAX_DEFINITIONS_PER_QUESTION = 3
 
@@ -120,6 +125,10 @@ class QuestionAlreadyAnsweredError(GamesError):
     """The question was already answered; only the first answer counts."""
 
 
+class NotEnoughWordsError(GamesError):
+    """The user has fewer words than the game needs (`GameOut.min_word_count`)."""
+
+
 # --------------------------------------------------------------------------- #
 # Listing and starting games
 # --------------------------------------------------------------------------- #
@@ -134,6 +143,7 @@ async def list_games_for_language(
     game's requirements; a word is due if it was never practiced in this game
     type or its review date has come. `next_due_at` is the earliest review
     date among the words that are not due yet (None if there are none).
+    `min_word_count` is how many words the game needs before it can start.
     """
     games = await db.scalars(
         select(Game)
@@ -163,6 +173,7 @@ async def list_games_for_language(
                 total_word_count=len(schedules),
                 due_word_count=len(schedules) - len(upcoming),
                 next_due_at=min(upcoming, default=None),
+                min_word_count=_min_word_count(game),
             )
         )
     return result
@@ -194,23 +205,23 @@ async def start_game_session(
     Raises:
         GameNotFoundError: no game has this id.
         GameNotImplementedError: the game's type cannot be played yet.
+        NotEnoughWordsError: a multiple-choice game, and the user has fewer
+            words than it needs for the options.
     """
     game = await db.get(Game, game_id)
     if game is None:
         raise GameNotFoundError("Game not found")
-    build_question = _QUESTION_BUILDERS.get(game.game_type)
-    if build_question is None:
+    spec = _GAME_SPECS.get(game.game_type)
+    if spec is None:
         raise GameNotImplementedError("This game isn't implemented yet")
-    return await _start_session(
-        db, user_id, game, language, mode, new_words_first, build_question
-    )
+    return await _start_session(db, user_id, game, language, mode, new_words_first, spec)
 
 
 def _word_recall_question(word: Word) -> QuestionOut:
     """type_word: guess the word from its definitions."""
     return QuestionOut(
         id=word.id,
-        question=word.defs[:MAX_DEFINITIONS_PER_QUESTION],
+        question=hidden_definitions(word.name, word.stems, word.defs)[:MAX_DEFINITIONS_PER_QUESTION],
         additional_info=QuestionAdditionalInfo(
             audio_url=word.audio_url,
             img_url=word.img_url,
@@ -247,18 +258,74 @@ def _image_question(word: Word) -> QuestionOut:
     )
 
 
+def _select_def_question(word: Word, pool: list[Word], option_count: int) -> tuple[QuestionOut, str]:
+    """select_def: pick the definition of the word."""
+    answer, options = definition_options(word, pool, option_count)
+    return QuestionOut(
+        id=word.id,
+        question=word.name,
+        options=options,
+        additional_info=QuestionAdditionalInfo(
+            audio_url=word.audio_url,
+            img_url=word.img_url,
+            examples=word.examples or None,
+        ),
+    ), answer
+
+
+def _select_word_question(word: Word, pool: list[Word], option_count: int) -> tuple[QuestionOut, str]:
+    """select_word: pick the word that the definitions describe."""
+    return QuestionOut(
+        id=word.id,
+        question=hidden_definitions(word.name, word.stems, word.defs)[:MAX_DEFINITIONS_PER_QUESTION],
+        options=word_options(word, pool, option_count),
+        additional_info=QuestionAdditionalInfo(
+            audio_url=word.audio_url,
+            img_url=word.img_url,
+            examples=word.examples or None,
+        ),
+    ), word.name
+
+
 def _meaning(word: Word) -> str:
     return f"{word.name} means {word.defs[0]}"
 
 
-# The game types that can be played, and how each turns a word into a
-# question. The answer is always the word's name; how it is graded is set by
+# Turns a word into a question and the answer the session store expects back.
+# `pool` is every word the game can use (empty unless the game has options).
+_BuildQuestion = Callable[[Word, list[Word], int], tuple[QuestionOut, str]]
+
+
+def _typed(build: Callable[[Word], QuestionOut]) -> _BuildQuestion:
+    """Adapt a typed game's builder: no options, and the answer is the word's name."""
+    return lambda word, pool, option_count: (build(word), word.name)
+
+
+@dataclass(frozen=True)
+class _GameSpec:
+    build: _BuildQuestion
+    has_options: bool = False
+
+
+# The game types that can be played. How answers are graded is set by
 # GAME_ANSWER_TYPES (games.constants).
-_QUESTION_BUILDERS: dict[str, Callable[[Word], QuestionOut]] = {
-    "type_word": _word_recall_question,
-    "audio": _audio_question,
-    "image": _image_question,
+_GAME_SPECS: dict[str, _GameSpec] = {
+    "type_word": _GameSpec(_typed(_word_recall_question)),
+    "audio": _GameSpec(_typed(_audio_question)),
+    "image": _GameSpec(_typed(_image_question)),
+    "select_def": _GameSpec(_select_def_question, has_options=True),
+    "select_word": _GameSpec(_select_word_question, has_options=True),
 }
+
+
+def _option_count(game: Game) -> int:
+    return game.default_config.get("options_per_question", DEFAULT_OPTIONS_PER_QUESTION)
+
+
+def _min_word_count(game: Game) -> int:
+    """A game with options needs a word for each option; any other needs one word."""
+    spec = _GAME_SPECS.get(game.game_type)
+    return _option_count(game) if spec and spec.has_options else 1
 
 
 async def _start_session(
@@ -268,26 +335,40 @@ async def _start_session(
     language: str,
     mode: GameMode,
     new_words_first: bool,
-    build_question: Callable[[Word], QuestionOut],
+    spec: _GameSpec,
 ) -> GameSessionOut:
     words_per_session = game.default_config.get(
         "words_per_session", DEFAULT_WORDS_PER_SESSION
     )
     schedules = await _load_schedules(db, user_id, language, game.game_type)
+    if spec.has_options and len(schedules) < _min_word_count(game):
+        raise NotEnoughWordsError(
+            f"This game needs at least {_min_word_count(game)} words"
+        )
     word_ids = _pick_word_ids(
         schedules, mode, new_words_first, datetime.now(UTC), words_per_session
     )
-    words = await get_words_by_ids(db, user_id, word_ids)
+
+    if spec.has_options:
+        # The options come from all the words the game can use.
+        pool = await get_words_by_ids(db, user_id, [s.word_id for s in schedules])
+        by_id = {w.id: w for w in pool}
+        words = [by_id[i] for i in word_ids if i in by_id]
+    else:
+        pool = []
+        words = await get_words_by_ids(db, user_id, word_ids)
     random.shuffle(words)
 
+    built = [spec.build(w, pool, _option_count(game)) for w in words]
+
     # Expected answers go to the session store only; the client gets clues.
-    answers = [{"word_id": w.id, "answer": w.name} for w in words]
+    answers = [{"word_id": q.id, "answer": answer} for q, answer in built]
     session_id = await create_game_session(user_id, game.id, game.game_type, answers)
 
     return GameSessionOut(
         task=GAME_TASKS[game.game_type],
         session_id=session_id,
-        questions=[build_question(w) for w in words],
+        questions=[q for q, _ in built],
     )
 
 

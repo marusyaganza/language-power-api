@@ -2,6 +2,23 @@ from words.language import Language
 from words.example import Example
 import json
 
+
+def unique_definitions(defs: list[str]) -> list[str]:
+    """Strip each definition and drop repeats, keeping the first of each.
+
+    Definitions that differ only in case or spacing count as repeats. The
+    dictionary returns some (e.g. "ser": "to be" three times).
+    """
+    seen = set()
+    result = []
+    for definition in defs:
+        definition = definition.strip()
+        key = " ".join(definition.lower().split())
+        if key not in seen:
+            seen.add(key)
+            result.append(definition)
+    return result
+
 class Word: 
     name: str
     stems: list[str]

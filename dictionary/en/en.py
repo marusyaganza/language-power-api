@@ -2,7 +2,7 @@ import httpx
 from words.language import Language
 from dictionary.base import DictionaryProvider
 from dictionary.helpers.mw import extract_examples, extract_audio, extract_transcription, format_name, is_suggestion_response
-from words.word import Word
+from words.word import Word, unique_definitions
 from dictionary.base import SearchResult
 from settings import settings
 
@@ -28,7 +28,7 @@ class EnglishDictionaryProvider(DictionaryProvider):
         uuid = meta['uuid']
         stems =  meta['stems']
         fl = word['fl']
-        defs = word.get('shortdef', [])
+        defs = unique_definitions(word.get('shortdef', []))
         audio_url = extract_audio(word, language, 'us')
         transcription = extract_transcription(word)
         examples = extract_examples(word)

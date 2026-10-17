@@ -2,6 +2,8 @@ from pydantic import BaseModel, Field, field_validator, BeforeValidator
 from typing import Annotated
 from enum import Enum
 
+from words.word import unique_definitions
+
 def _empty_str_to_none(value):
     if isinstance(value, str) and value.strip() == "":
         return None
@@ -34,7 +36,7 @@ class WordCreate(BaseModel):
         cleaned = [d.strip() for d in value]
         if any(not d for d in cleaned):
             raise ValueError("Definitions cannot be empty or blank")
-        return cleaned
+        return unique_definitions(cleaned)
 
 
 class WordOut(BaseModel):
@@ -82,8 +84,8 @@ class WordUpdate(BaseModel):
     def defs_must_be_non_blank(cls, value: list[str] | None) -> list[str] | None:
         cleaned = [item.strip() for item in value if item and item.strip()]
         if not cleaned:
-            raise ValueError("examples must contain at least one non-empty string")
-        return cleaned
+            raise ValueError("Definitions must contain at least one non-empty string")
+        return unique_definitions(cleaned)
 
 class WordSearchResponse(BaseModel):
     words: list[WordOut]
