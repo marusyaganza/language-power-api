@@ -1,22 +1,23 @@
-# words/repository.py
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-from math import ceil
+"""Queries on the words tables. Never commits; callers own the transaction."""
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from words.models import Word
 from words.schemas import VocabularySortBy
 
-def get_saved_uuids(db: Session, user_id: int, uuids: list[str]) -> set[str]:
+
+async def get_saved_uuids(db: AsyncSession, user_id: int, uuids: list[str]) -> set[str]:
     if not uuids:
         return set()
-    rows = (
-        db.query(Word.uuid)
-        .filter(Word.user_id == user_id, Word.uuid.in_(uuids))
-        .all()
+    rows = await db.scalars(
+        select(Word.uuid).where(Word.user_id == user_id, Word.uuid.in_(uuids))
     )
-    return {r.uuid for r in rows}
+    return set(rows.all())
 
-def get_vocabulary(
-    db: Session,
+
+async def get_vocabulary(
+    db: AsyncSession,
     user_id: int,
     *,
     language: str,
@@ -25,17 +26,22 @@ def get_vocabulary(
     page_size: int = 5,
     sort_by: VocabularySortBy = VocabularySortBy.created_at,
 ) -> tuple[list[Word], int]:
-    q = db.query(Word).filter(Word.user_id == user_id, Word.language == language)
+    stmt = select(Word).where(Word.user_id == user_id, Word.language == language)
 
     if query:
-        q = q.filter(Word.name.ilike(f"%{query}%"))
+        stmt = stmt.where(Word.name.ilike(f"%{query}%"))
 
-    total = q.with_entities(func.count(Word.id)).scalar()
+    total = await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
 
     if sort_by == VocabularySortBy.name:
-        q = q.order_by(Word.name.asc())
+        stmt = stmt.order_by(Word.name.asc())
     else:
-        q = q.order_by(Word.created_at.desc())
+        stmt = stmt.order_by(Word.created_at.desc())
 
-    items = q.offset((page - 1) * page_size).limit(page_size).all()
-    return items, total
+    # Callers serialize `examples`, and an async session cannot lazy-load them.
+    items = await db.scalars(
+        stmt.options(selectinload(Word.examples))
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return list(items.all()), total

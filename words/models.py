@@ -1,4 +1,3 @@
-# words/models.py
 from sqlalchemy import (
     Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, CheckConstraint
 )
@@ -9,7 +8,6 @@ from sqlalchemy.sql import func
 from core.database import Base
 
 
-# words/models.py
 class Word(Base):
     __tablename__ = "words"
     __table_args__ = (
@@ -32,9 +30,9 @@ class Word(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    user = relationship("User", back_populates="words")
-    examples = relationship("Example", back_populates="word", cascade="all, delete-orphan")
-    progress = relationship("WordProgress", back_populates="word", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="words", lazy="raise")
+    examples = relationship("Example", back_populates="word", cascade="all, delete-orphan", lazy="raise")
+    progress = relationship("WordProgress", back_populates="word", cascade="all, delete-orphan", lazy="raise")
 
     gender: Mapped[str | None] = mapped_column(nullable=True)  # "masculine" | "feminine" | None
 
@@ -46,4 +44,4 @@ class Example(Base):
     text = Column(String, nullable=False)
     translation = Column(String, nullable=True)
 
-    word = relationship("Word", back_populates="examples")
+    word = relationship("Word", back_populates="examples", lazy="raise")

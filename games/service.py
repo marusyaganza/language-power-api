@@ -1,20 +1,117 @@
-# games/service.py
-from sqlalchemy import select, or_
-from games.models import Game, GameLanguage
-from games.schemas import GameOut, GameSessionOut, QuestionOut, QuestionAdditionalInfo
-from games.constants import GAME_TYPE_REQUIREMENTS, GAME_TASKS
-from words.service import count_saved_words, get_words_for_session
-from games.session_store import create_game_session
+"""Games: which games a user can play, running a game session, and learning progress.
+
+Two different things are called a "session" in this code, so they are named
+differently:
+
+* `db` is the database session (SQLAlchemy).
+* A *game session* is a short-lived set of questions that lives in the session
+  store (`games.session_store`), not in the database. It holds the expected
+  answers, so they never have to be sent to the client.
+
+The database only keeps what outlasts a game session: per-word learning
+progress (`WordProgress`) and a log of every answer (`ReviewLog`).
+
+Rules that apply to every function below:
+
+* Games read words only through `words.service`, never from the `Word` table.
+  `words` knows nothing about games; the words a game needs are described by
+  `GAME_TYPE_REQUIREMENTS` (games.constants), whose keys must match the
+  `requires_*` keyword arguments of `words.service.get_random_words`.
+* Failures are raised as subclasses of `GamesError`. This module knows nothing
+  about HTTP; the router decides how each error is presented.
+* `db` must be an `AsyncSession`.
+"""
 import logging
-from core.database import SessionLocal
-from games.models import WordProgress, ReviewLog
-from games.spaced_repetition import initialize_progress, update_progress, WordProgressState
-from games.scoring import AnswerGrade
+from dataclasses import dataclass
+
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.database import AsyncSessionLocal
+from games.constants import GAME_ANSWER_TYPES, GAME_TASKS, GAME_TYPE_REQUIREMENTS
+from games.models import Game, GameLanguage, ReviewLog, WordProgress
+from games.schemas import GameOut, GameSessionOut, QuestionAdditionalInfo, QuestionOut
+from games.scoring import AnswerGrade, classify_choice_answer, classify_typed_answer
+from games.session_store import (
+    GameSessionNotFound,
+    create_game_session,
+    get_game_session,
+    get_question,
+    mark_question_answered,
+)
+from games.spaced_repetition import (
+    WordProgressState,
+    initialize_progress,
+    update_progress,
+)
+from words.service import count_words, get_random_words
+
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "GamesError",
+    "GameNotFoundError",
+    "GameNotImplementedError",
+    "SessionNotFoundError",
+    "SessionGameMismatchError",
+    "QuestionNotFoundError",
+    "AnswerCheck",
+    "list_games_for_language",
+    "start_game_session",
+    "check_answer",
+    "persist_review_result",
+]
 
-def list_games_for_language(session, user_id, language) -> list[GameOut]:
-    games = session.scalars(
+# The only game type that can be played so far (the typed word-recall game).
+WORD_RECALL_GAME_TYPE = "type_word"
+DEFAULT_WORDS_PER_SESSION = 10
+# How many of a word's definitions are shown as clues in a question.
+MAX_DEFINITIONS_PER_QUESTION = 3
+
+
+# --------------------------------------------------------------------------- #
+# Errors
+# --------------------------------------------------------------------------- #
+
+class GamesError(Exception):
+    """Base class for every error this module raises on purpose."""
+
+
+class GameNotFoundError(GamesError):
+    """There is no game with the given id."""
+
+
+class GameNotImplementedError(GamesError):
+    """The game exists but its type cannot be played yet."""
+
+
+class SessionNotFoundError(GamesError):
+    """The game session expired or never existed."""
+
+
+class SessionGameMismatchError(GamesError):
+    """The game session was started for a different game."""
+
+
+class QuestionNotFoundError(GamesError):
+    """The game session has no question for the given word."""
+
+
+# --------------------------------------------------------------------------- #
+# Listing and starting games
+# --------------------------------------------------------------------------- #
+
+async def list_games_for_language(
+    db: AsyncSession, user_id: int, language: str
+) -> list[GameOut]:
+    """List the games offered for `language`, in display order (`Game.order_num`).
+
+    A game is offered if it is marked for all languages or is linked to
+    `language`. `available_word_count` is how many of the user's saved words
+    meet the game's requirements, and `is_enabled` is True when at least one
+    does.
+    """
+    games = await db.scalars(
         select(Game)
         .where(
             or_(
@@ -25,39 +122,70 @@ def list_games_for_language(session, user_id, language) -> list[GameOut]:
             )
         )
         .order_by(Game.order_num)
-    ).all()
+    )
 
     result = []
-    for g in games:
-        requirements = GAME_TYPE_REQUIREMENTS.get(g.game_type, {})
-        print('requirements', requirements)
-        word_count = count_saved_words(session, user_id, language, **requirements)
+    for game in games.all():
+        requirements = GAME_TYPE_REQUIREMENTS.get(game.game_type, {})
+        word_count = await count_words(db, user_id, language, **requirements)
         result.append(
             GameOut(
-                id=g.id,
-                slug=g.slug,
-                title=g.title,
-                description=g.description,
-                game_type=g.game_type,
+                id=game.id,
+                slug=game.slug,
+                title=game.title,
+                description=game.description,
+                game_type=game.game_type,
                 available_word_count=word_count,
                 is_enabled=word_count > 0,
             )
         )
     return result
 
-def start_word_recall_session(session, user_id: int, game, language: str) -> GameSessionOut:
-    words_per_session = game.default_config.get("words_per_session", 10)
+
+async def start_game_session(
+    db: AsyncSession, user_id: int, game_id: int, language: str
+) -> GameSessionOut:
+    """Start a game session of random questions from the user's saved words.
+
+    The number of questions is the game's `words_per_session` setting. If the
+    user has fewer matching words than that, the session has fewer questions
+    (possibly none); use `list_games_for_language` to find out beforehand.
+
+    The session's expected answers are kept in the session store and are not
+    part of the result. Whether the game is offered for `language` is not
+    checked here.
+
+    Raises:
+        GameNotFoundError: no game has this id.
+        GameNotImplementedError: the game's type cannot be played yet.
+    """
+    game = await db.get(Game, game_id)
+    if game is None:
+        raise GameNotFoundError("Game not found")
+    if game.game_type != WORD_RECALL_GAME_TYPE:
+        raise GameNotImplementedError("This game isn't implemented yet")
+    return await _start_word_recall_session(db, user_id, game, language)
+
+
+async def _start_word_recall_session(
+    db: AsyncSession, user_id: int, game: Game, language: str
+) -> GameSessionOut:
+    words_per_session = game.default_config.get(
+        "words_per_session", DEFAULT_WORDS_PER_SESSION
+    )
     requirements = GAME_TYPE_REQUIREMENTS.get(game.game_type, {})
+    words = await get_random_words(
+        db, user_id, language, words_per_session, **requirements
+    )
 
-    words = get_words_for_session(session, user_id, language, words_per_session, **requirements)
-
+    # Expected answers go to the session store only; the client gets clues.
     answers = [{"word_id": w.id, "answer": w.name} for w in words]
-    session_id = create_game_session(game.id, game.game_type, answers)
+    session_id = await create_game_session(user_id, game.id, game.game_type, answers)
 
     questions = [
         QuestionOut(
             id=w.id,
-            question=w.defs[:3],
+            question=w.defs[:MAX_DEFINITIONS_PER_QUESTION],
             additional_info=QuestionAdditionalInfo(
                 audio_url=w.audio_url,
                 img_url=w.img_url,
@@ -66,62 +194,152 @@ def start_word_recall_session(session, user_id: int, game, language: str) -> Gam
         )
         for w in words
     ]
-
-    result = GameSessionOut(task=GAME_TASKS[game.game_type], session_id=session_id, questions=questions)
-
-    print(result)
-
-    return result
+    return GameSessionOut(
+        task=GAME_TASKS[game.game_type], session_id=session_id, questions=questions
+    )
 
 
-def persist_review_result(word_id: int, game_type: str, grade: AnswerGrade) -> None:
-    db = SessionLocal()
+# --------------------------------------------------------------------------- #
+# Answering
+# --------------------------------------------------------------------------- #
+
+@dataclass(frozen=True)
+class AnswerCheck:
+    """The outcome of grading one answer.
+
+    `correct_answer` is None when the answer was fully correct, otherwise the
+    expected answer. `game_type` is passed along so the caller can record the
+    review with `persist_review_result`.
+    """
+
+    grade: AnswerGrade
+    correct_answer: str | None
+    session_complete: bool
+    game_type: str
+
+
+async def check_answer(
+    user_id: int, session_id: str, game_id: int, word_id: int, answer: str
+) -> AnswerCheck:
+    """Grade `answer` for the question about `word_id` and mark it answered.
+
+    Typed games are graded with `classify_typed_answer`, all others with
+    `classify_choice_answer`. This only touches the session store; the review
+    is not recorded until the caller passes the result to
+    `persist_review_result`.
+
+    Only the user who started the session can answer it. Another user's
+    session is reported exactly like one that does not exist, so a leaked
+    session id reveals nothing.
+
+    Raises:
+        SessionNotFoundError: the session expired, never existed, or belongs
+            to another user.
+        SessionGameMismatchError: the session belongs to a different game.
+        QuestionNotFoundError: the session has no question for `word_id`.
+    """
     try:
-        progress = (
-            db.query(WordProgress)
-            .filter(WordProgress.word_id == word_id, WordProgress.game_type == game_type)
-            .first()
-        )
-        if progress is None:
-            initial = initialize_progress()
-            progress = WordProgress(
-                word_id=word_id,
-                game_type=game_type,
-                is_learning=initial.is_learning,
-                learning_step_index=initial.learning_step_index,
-                interval_days=initial.interval_days,
-                consecutive_correct=initial.consecutive_correct,
-                lapses=initial.lapses,
-                next_review_date=initial.next_review_date,
+        session_data = await get_game_session(session_id)
+    except GameSessionNotFound as exc:
+        raise SessionNotFoundError("Session expired or not found") from exc
+
+    if session_data.get("user_id") != user_id:
+        raise SessionNotFoundError("Session expired or not found")
+
+    if session_data["game_id"] != game_id:
+        raise SessionGameMismatchError("Session does not belong to this game")
+
+    try:
+        question = get_question(session_data, word_id)
+    except GameSessionNotFound as exc:
+        raise QuestionNotFoundError("Question not found in session") from exc
+
+    game_type = session_data["game_type"]
+    grade = _grade(game_type, answer, question["answer"])
+    session_complete = await mark_question_answered(session_id, session_data, word_id)
+
+    return AnswerCheck(
+        grade=grade,
+        correct_answer=None if grade == AnswerGrade.CORRECT else question["answer"],
+        session_complete=session_complete,
+        game_type=game_type,
+    )
+
+
+def _grade(game_type: str, given: str, expected: str) -> AnswerGrade:
+    """Grade an answer by the way this game type collects answers."""
+    if GAME_ANSWER_TYPES.get(game_type, "choice") == "typed":
+        return classify_typed_answer(given, expected)
+    return classify_choice_answer(given, expected)
+
+
+# --------------------------------------------------------------------------- #
+# Learning progress
+# --------------------------------------------------------------------------- #
+
+async def persist_review_result(
+    word_id: int, game_type: str, grade: AnswerGrade
+) -> None:
+    """Update the spaced-repetition progress for a word and log the review.
+
+    Progress is kept per (word, game type) and is created on the first review.
+    Intended to run as a background task after the answer has been returned,
+    so it opens its own database session (the request's is already closed).
+    Failures are logged and swallowed, because the user has already received
+    their answer and there is nobody to report the error to.
+    """
+    # The try wraps the session too, so a failure to connect is logged like
+    # any other. Leaving the block without committing rolls back.
+    try:
+        async with AsyncSessionLocal() as db:
+            progress = await db.scalar(
+                select(WordProgress).where(
+                    WordProgress.word_id == word_id,
+                    WordProgress.game_type == game_type,
+                )
             )
-            db.add(progress)
-            db.flush()  # assigns progress.id for the ReviewLog FK below
+            if progress is None:
+                progress = WordProgress(word_id=word_id, game_type=game_type)
+                _write_state(progress, initialize_progress())
+                db.add(progress)
+                await db.flush()  # assigns progress.id for the ReviewLog FK below
 
-        state = WordProgressState(
-            is_learning=progress.is_learning,
-            learning_step_index=progress.learning_step_index,
-            interval_days=progress.interval_days,
-            consecutive_correct=progress.consecutive_correct,
-            lapses=progress.lapses,
-            next_review_date=progress.next_review_date,
-        )
-        updated = update_progress(state, grade)
+            _write_state(progress, update_progress(_read_state(progress), grade))
 
-        progress.is_learning = updated.is_learning
-        progress.learning_step_index = updated.learning_step_index
-        progress.interval_days = updated.interval_days
-        progress.consecutive_correct = updated.consecutive_correct
-        progress.lapses = updated.lapses
-        progress.next_review_date = updated.next_review_date
-
-        db.add(ReviewLog(
-            progress=progress,
-            grade=grade.value,
-            interval_at_review=progress.interval_days,
-        ))
-        db.commit()
+            # TODO: this logs the interval *after* the update. If the column
+            # means "interval when the review happened", log the old one.
+            db.add(
+                ReviewLog(
+                    progress=progress,
+                    grade=grade.value,
+                    interval_at_review=progress.interval_days,
+                )
+            )
+            await db.commit()
     except Exception:
-        db.rollback()
-        logger.exception("Failed to persist review result for word_id=%s, game_type=%s", word_id, game_type)
-    finally:
-        db.close()
+        logger.exception(
+            "Failed to persist review result for word_id=%s, game_type=%s",
+            word_id,
+            game_type,
+        )
+
+
+# The fields shared by `WordProgress` (the row) and `WordProgressState` (what
+# the spaced-repetition code reads and returns).
+_STATE_FIELDS = (
+    "is_learning",
+    "learning_step_index",
+    "interval_days",
+    "consecutive_correct",
+    "lapses",
+    "next_review_date",
+)
+
+
+def _read_state(progress: WordProgress) -> WordProgressState:
+    return WordProgressState(**{f: getattr(progress, f) for f in _STATE_FIELDS})
+
+
+def _write_state(progress: WordProgress, state: WordProgressState) -> None:
+    for field in _STATE_FIELDS:
+        setattr(progress, field, getattr(state, field))

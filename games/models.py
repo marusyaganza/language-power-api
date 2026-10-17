@@ -26,7 +26,7 @@ class Game(Base):
     all_languages: Mapped[bool] = mapped_column(default=False)
     default_config: Mapped[dict] = mapped_column(JSONB, default=dict)
 
-    languages: Mapped[list["GameLanguage"]] = relationship(cascade="all, delete-orphan")
+    languages: Mapped[list["GameLanguage"]] = relationship(cascade="all, delete-orphan", lazy="raise")
 
 class GameLanguage(Base):
     __tablename__ = "game_languages"
@@ -54,8 +54,8 @@ class WordProgress(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    word = relationship("Word", back_populates="progress")
-    review_logs = relationship("ReviewLog", back_populates="progress", cascade="all, delete-orphan")
+    word = relationship("Word", back_populates="progress", lazy="raise")
+    review_logs = relationship("ReviewLog", back_populates="progress", cascade="all, delete-orphan", lazy="raise")
 
 
 class ReviewLog(Base):
@@ -67,4 +67,4 @@ class ReviewLog(Base):
     interval_at_review = Column(Float, nullable=False)
     answered_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    progress = relationship("WordProgress", back_populates="review_logs")
+    progress = relationship("WordProgress", back_populates="review_logs", lazy="raise")

@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     audio_endpoint: str
     img_endpoint: str
     use_mocks: str
-    database_url: str = "postgresql+psycopg2://app_user:dev_password@localhost:5432/language_app"
+    database_url: str = "postgresql+psycopg://app_user:dev_password@localhost:5432/language_app"
     signup_enabled: bool = True
 
     redis_host: str = "localhost"

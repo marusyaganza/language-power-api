@@ -68,7 +68,7 @@ class VocabularyPage(BaseModel):
 
 class ExampleUpdate(BaseModel):
     text: str
-    translation: str
+    translation: OptionalStr = None
 
 
 class WordUpdate(BaseModel):
