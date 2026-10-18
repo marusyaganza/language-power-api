@@ -13,6 +13,7 @@ from auth.dependencies import get_current_user
 from core.database import get_db
 from words import service
 from words.schemas import (
+    SortOrder,
     VocabularyPage,
     VocabularySortBy,
     WordCreate,
@@ -82,10 +83,14 @@ async def list_vocabulary(
     query: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     sort_by: VocabularySortBy = Query(default=VocabularySortBy.created_at),
+    sort_order: SortOrder | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Return one page of the user's saved words in a language."""
+    """Return one page of the user's saved words in a language.
+
+    Without `sort_order`, names sort A–Z and dates newest first.
+    """
     with _http_errors():
         return await service.get_vocabulary_page(
             db,
@@ -94,6 +99,7 @@ async def list_vocabulary(
             query=query,
             page=page,
             sort_by=sort_by,
+            sort_order=sort_order,
         )
 
 

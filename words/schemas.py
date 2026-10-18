@@ -64,6 +64,11 @@ class VocabularySortBy(str, Enum):
     name = "name"
 
 
+class SortOrder(str, Enum):
+    asc = "asc"
+    desc = "desc"
+
+
 class VocabularyPage(BaseModel):
     items: list[WordOut]
     page: int

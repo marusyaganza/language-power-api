@@ -4,7 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from words.models import Word
-from words.schemas import VocabularySortBy
+from words.schemas import SortOrder, VocabularySortBy
+
+# Order used for each sort field when the caller does not choose one.
+_DEFAULT_ORDER = {
+    VocabularySortBy.name: SortOrder.asc,
+    VocabularySortBy.created_at: SortOrder.desc,
+}
 
 
 async def get_saved_uuids(db: AsyncSession, user_id: int, uuids: list[str]) -> set[str]:
@@ -25,6 +31,7 @@ async def get_vocabulary(
     page: int = 1,
     page_size: int = 5,
     sort_by: VocabularySortBy = VocabularySortBy.created_at,
+    sort_order: SortOrder | None = None,
 ) -> tuple[list[Word], int]:
     stmt = select(Word).where(Word.user_id == user_id, Word.language == language)
 
@@ -33,10 +40,9 @@ async def get_vocabulary(
 
     total = await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
 
-    if sort_by == VocabularySortBy.name:
-        stmt = stmt.order_by(Word.name.asc())
-    else:
-        stmt = stmt.order_by(Word.created_at.desc())
+    column = Word.name if sort_by == VocabularySortBy.name else Word.created_at
+    order = sort_order or _DEFAULT_ORDER[sort_by]
+    stmt = stmt.order_by(column.asc() if order == SortOrder.asc else column.desc())
 
     # Callers serialize `examples`, and an async session cannot lazy-load them.
     items = await db.scalars(

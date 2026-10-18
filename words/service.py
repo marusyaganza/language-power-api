@@ -30,6 +30,7 @@ from dictionary.providers import PROVIDERS
 from words.models import Example, Word
 from words.repository import get_saved_uuids, get_vocabulary
 from words.schemas import (
+    SortOrder,
     VocabularyPage,
     VocabularySortBy,
     WordCreate,
@@ -210,6 +211,7 @@ async def get_vocabulary_page(
     query: str | None,
     page: int,
     sort_by: VocabularySortBy,
+    sort_order: SortOrder | None = None,
 ) -> VocabularyPage:
     """Return one page of the user's saved words in `language`.
 
@@ -217,6 +219,9 @@ async def get_vocabulary_page(
     an optional search text; how it is matched is decided by
     `repository.get_vocabulary`. `total` counts every matching word across all
     pages, and `total_pages` is 0 when nothing matches.
+
+    `sort_order` defaults to ascending for `name` and descending (newest
+    first) for `created_at`.
     """
     items, total = await get_vocabulary(
         db,
@@ -226,6 +231,7 @@ async def get_vocabulary_page(
         page=page,
         page_size=VOCABULARY_PAGE_SIZE,
         sort_by=sort_by,
+        sort_order=sort_order,
     )
     return VocabularyPage(
         items=[WordOut.model_validate(w) for w in items],
