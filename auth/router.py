@@ -82,7 +82,10 @@ async def logout(
 @auth_router.get("/config")
 async def auth_config():
     """Public settings the frontend needs before anyone is logged in."""
-    return {"signup_enabled": service.signups_open()}
+    return {
+        "signup_enabled": service.signups_open(),
+        "use_mocks": service.mocks_enabled(),
+    }
 
 
 @auth_router.get("/me", response_model=UserOut)

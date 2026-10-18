@@ -24,7 +24,6 @@ def extract_examples(data):
 def _format_example(example):
     t = strip_mw_markup(example.get('t'))
     tr = example.get('tr', None)
-    print(Example(text=t, translation=tr))
     return Example(text=t, translation=tr)
 
 def extract_audio(word, language, countryCode): 

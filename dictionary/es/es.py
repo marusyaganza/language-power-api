@@ -8,13 +8,13 @@ from settings import settings
 from dictionary.helpers.mw import format_name, extract_audio, is_suggestion_response, extract_gender
 
 class SpanishDictionaryProvider(DictionaryProvider):
-    async def fetch(self, query: str) -> list[Word]:
+    async def fetch(self, query: str) -> SearchResult:
        raw_items = await self._fetch_raw(query)
        if is_suggestion_response(raw_items):
         return SearchResult(suggestions=raw_items)
        return SearchResult(words=[self._format(item) for item in raw_items])
     
-    async def _fetch_raw(self, query: str) -> list[Word]:
+    async def _fetch_raw(self, query: str) -> list:
         async with httpx.AsyncClient() as client:
             resp = await client.get(f"{settings.spanish_api_url}/{query}?key={settings.spanish_api_key}")
             data = resp.json()

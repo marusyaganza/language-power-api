@@ -7,7 +7,7 @@ from dictionary.base import SearchResult
 from settings import settings
 
 class EnglishDictionaryProvider(DictionaryProvider):
-    async def fetch(self, query: str) -> list[Word]:
+    async def fetch(self, query: str) -> SearchResult:
         raw_items = await self._fetch_raw(query)
 
         if is_suggestion_response(raw_items):
@@ -15,7 +15,7 @@ class EnglishDictionaryProvider(DictionaryProvider):
 
         return SearchResult(words=[self._format(item) for item in raw_items])
     
-    async def _fetch_raw(self, query: str) -> list[Word]:
+    async def _fetch_raw(self, query: str) -> list:
         async with httpx.AsyncClient() as client:
             resp = await client.get(f"{settings.english_api_url}/{query}?key={settings.english_api_key}")
             data = resp.json()

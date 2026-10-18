@@ -97,4 +97,6 @@ class WordUpdate(BaseModel):
 
 class WordSearchResponse(BaseModel):
     words: list[WordOut]
-    suggestions: list[str] = []
+    suggestions: list[str] = []  # spelling suggestions from the dictionary
+    # Mock mode only, when the query has no mock data: the queries that do.
+    mock_queries: list[str] = []

@@ -94,8 +94,9 @@ async def search_words(
     with the same dictionary uuid. Words the dictionary returns without a uuid
     are never marked as saved.
 
-    A non-empty response that contains no words (for example, spelling
-    suggestions) is a normal result and is returned unchanged.
+    A response that contains no words but spelling suggestions, or (with
+    mocks on) the queries that have mock data, is a normal result and is
+    returned unchanged.
 
     Raises:
         UnsupportedLanguageError: there is no provider for `language`.
@@ -106,7 +107,7 @@ async def search_words(
         raise UnsupportedLanguageError(f"Unsupported language: {language}")
 
     results = await provider.fetch(query)
-    if not results:
+    if results.is_empty:
         raise DefinitionNotFoundError("Word not found")
     if not results.words:
         return results

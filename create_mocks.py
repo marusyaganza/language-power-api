@@ -8,11 +8,11 @@ delete it whenever you're happy with the fixtures.
 
 import asyncio
 import json
-from pathlib import Path
 
 import httpx
 
-from settings import settings  # adjust import path to match your project layout
+from dictionary.mock import FIXTURES_DIR  # where the mock providers read them
+from settings import settings
 
 WORDS = {
     "en": [
@@ -40,9 +40,6 @@ WORDS = {
         "ballena",
     ],
 }
-
-# where fixtures land - matches the MockDictionaryProvider path from earlier
-FIXTURES_DIR = Path(__file__).parent / "providers" / "fixtures"
 
 API_CONFIG = {
     "en": {"url": settings.english_api_url, "key": settings.english_api_key},

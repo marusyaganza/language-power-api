@@ -31,6 +31,7 @@ __all__ = [
     "InvalidCredentialsError",
     "AuthResult",
     "signups_open",
+    "mocks_enabled",
     "signup",
     "login",
     "create_session",
@@ -75,6 +76,15 @@ class AuthResult:
 def signups_open() -> bool:
     """Whether new accounts can currently be created (the `signup_enabled` setting)."""
     return settings.signup_enabled
+
+
+def mocks_enabled() -> bool:
+    """Whether dictionary lookups use mock data (the `use_mocks` setting).
+
+    Read the same way as in `dictionary.providers`: only the exact string
+    "True" turns mocks on.
+    """
+    return settings.use_mocks == "True"
 
 
 async def signup(db: AsyncSession, user_in: UserCreate) -> AuthResult:
