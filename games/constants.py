@@ -24,3 +24,28 @@ GAME_TASKS = {
     "image": "Type the name of the object shown in the picture.",
     "gender": "Pick the Correct Gender",
 }
+# Spaced-repetition presets a user can pick from. "recommended" is what users
+# get until they change their settings; keep it equal to the defaults of
+# games.spaced_repetition.SpacedRepetitionConfig.
+GAME_SETTINGS_PRESETS = [
+    {
+        "id": "recommended",
+        "title": "Recommended",
+        "description": "A balanced schedule for steady daily practice: new words come back "
+        "after 15 minutes, a day and 6 days before they are considered learned.",
+        "settings": {"learning_steps_minutes": [15, 1440, 8640], "graduating_interval_days": 6, "strict_mode": False},
+    },
+    {
+        "id": "intensive",
+        "title": "Intensive",
+        "description": "More frequent reviews for fast progress, e.g. before an exam or a trip. "
+        "Forgetting a learned word sends it back to the start.",
+        "settings": {"learning_steps_minutes": [15, 240, 1440], "graduating_interval_days": 3, "strict_mode": True},
+    },
+    {
+        "id": "relaxed",
+        "title": "Relaxed",
+        "description": "Fewer, more spaced-out reviews for casual learners who practice a few times a week.",
+        "settings": {"learning_steps_minutes": [1440, 4320], "graduating_interval_days": 7, "strict_mode": False},
+    },
+]

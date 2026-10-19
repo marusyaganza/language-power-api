@@ -27,9 +27,14 @@ from games.schemas import (
     GameOut,
     GameResultOut,
     GameSessionOut,
+    GameSettingsOut,
+    GameSettingsPreset,
+    GameSettingsUpdate,
 )
 
 router = APIRouter(prefix="/games", tags=["games"])
+# The settings belong to the logged-in user, hence /users/me rather than /games.
+settings_router = APIRouter(prefix="/users/me/game-settings", tags=["games"])
 
 _STATUS_FOR_ERROR: dict[type[service.GamesError], int] = {
     service.GameNotFoundError: status.HTTP_404_NOT_FOUND,
@@ -117,6 +122,7 @@ async def submit_answer(
 
     background_tasks.add_task(
         service.persist_review_result,
+        user_id=user.id,
         word_id=payload.word_id,
         game_type=check.game_type,
         grade=check.grade,
@@ -138,3 +144,32 @@ async def get_game_result(game_session_id: str, user=Depends(get_current_user)):
     """
     with _http_errors():
         return await service.get_session_result(user.id, game_session_id)
+
+
+@settings_router.get("", response_model=GameSettingsOut)
+async def get_game_settings(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The user's spaced-repetition settings (the default preset's if never changed)."""
+    return await service.get_game_settings(db, user.id)
+
+
+@settings_router.put("", response_model=GameSettingsOut)
+async def update_game_settings(
+    payload: GameSettingsUpdate,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Replace the user's spaced-repetition settings.
+
+    They apply to each word from its next answer; scheduled reviews keep
+    their dates. 422 if the values are out of range or inconsistent.
+    """
+    return await service.update_game_settings(db, user.id, payload)
+
+
+@settings_router.get("/presets", response_model=list[GameSettingsPreset])
+async def list_game_settings_presets(user=Depends(get_current_user)):
+    """The presets a user can pick from, the first being the default."""
+    return service.list_game_settings_presets()

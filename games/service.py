@@ -27,19 +27,28 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from pydantic import ValidationError
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import AsyncSessionLocal
-from games.constants import GAME_ANSWER_TYPES, GAME_TASKS, GAME_TYPE_REQUIREMENTS
+from games.constants import (
+    GAME_ANSWER_TYPES,
+    GAME_SETTINGS_PRESETS,
+    GAME_TASKS,
+    GAME_TYPE_REQUIREMENTS,
+)
 from games.hints import hidden_definitions
 from games.options import definition_options, word_options
-from games.models import Game, GameLanguage, ReviewLog, WordProgress
+from games.models import Game, GameLanguage, GameSettings, ReviewLog, WordProgress
 from games.schemas import (
     GameMode,
     GameOut,
     GameResultOut,
     GameSessionOut,
+    GameSettingsOut,
+    GameSettingsPreset,
+    GameSettingsUpdate,
     QuestionAdditionalInfo,
     QuestionOut,
     QuestionResult,
@@ -60,6 +69,7 @@ from games.session_store import (
     mark_question_answered,
 )
 from games.spaced_repetition import (
+    SpacedRepetitionConfig,
     WordProgressState,
     initialize_progress,
     update_progress,
@@ -85,6 +95,9 @@ __all__ = [
     "check_answer",
     "get_session_result",
     "persist_review_result",
+    "get_game_settings",
+    "update_game_settings",
+    "list_game_settings_presets",
 ]
 
 DEFAULT_WORDS_PER_SESSION = 10
@@ -632,9 +645,12 @@ def _percent_half_up(part: int, total: int) -> int:
 # --------------------------------------------------------------------------- #
 
 async def persist_review_result(
-    word_id: int, game_type: str, grade: AnswerGrade
+    user_id: int, word_id: int, game_type: str, grade: AnswerGrade
 ) -> None:
     """Log a review of a word and, if the word was due, update its schedule.
+
+    The schedule follows the user's settings (`get_game_settings`) as they are
+    now; reviews already scheduled are not moved when the settings change.
 
     Progress is kept per (word, game type) and is created on the first review;
     a word never reviewed is due. Answering a word that is not due yet (only
@@ -668,7 +684,8 @@ async def persist_review_result(
 
             interval_at_review = progress.interval_days
             if is_due:
-                _write_state(progress, update_progress(_read_state(progress), grade))
+                config = await _load_config(db, user_id)
+                _write_state(progress, update_progress(_read_state(progress), grade, config))
             progress.last_reviewed_at = now
 
             db.add(
@@ -685,6 +702,75 @@ async def persist_review_result(
             word_id,
             game_type,
         )
+
+
+# --------------------------------------------------------------------------- #
+# Settings
+# --------------------------------------------------------------------------- #
+
+def list_game_settings_presets() -> list[GameSettingsPreset]:
+    """The presets a user can pick from, the first being the default."""
+    return [GameSettingsPreset(**preset) for preset in GAME_SETTINGS_PRESETS]
+
+
+async def get_game_settings(db: AsyncSession, user_id: int) -> GameSettingsOut:
+    """The user's spaced-repetition settings, or the default preset's if never set."""
+    settings = await _read_settings(db, user_id)
+    return GameSettingsOut(**settings.model_dump(), preset=_preset_id(settings))
+
+
+async def update_game_settings(
+    db: AsyncSession, user_id: int, settings: GameSettingsUpdate
+) -> GameSettingsOut:
+    """Replace the user's spaced-repetition settings.
+
+    They apply to each word from its next answer on; reviews already
+    scheduled keep their dates.
+    """
+    row = await db.get(GameSettings, user_id)
+    if row is None:
+        row = GameSettings(user_id=user_id)
+        db.add(row)
+    row.learning_steps_minutes = settings.learning_steps_minutes
+    row.graduating_interval_days = settings.graduating_interval_days
+    row.strict_mode = settings.strict_mode
+    await db.commit()
+    return GameSettingsOut(**settings.model_dump(), preset=_preset_id(settings))
+
+
+async def _read_settings(db: AsyncSession, user_id: int) -> GameSettingsUpdate:
+    """The stored settings, or the default preset's.
+
+    Stored values are validated again, and replaced by the defaults if they
+    no longer pass (e.g. after the limits were tightened), so a bad row can
+    never break scheduling.
+    """
+    row = await db.get(GameSettings, user_id)
+    if row is not None:
+        try:
+            return GameSettingsUpdate(
+                learning_steps_minutes=row.learning_steps_minutes,
+                graduating_interval_days=row.graduating_interval_days,
+                strict_mode=row.strict_mode,
+            )
+        except ValidationError:
+            logger.warning("Invalid game settings for user_id=%s; using defaults", user_id)
+    return list_game_settings_presets()[0].settings
+
+
+async def _load_config(db: AsyncSession, user_id: int) -> SpacedRepetitionConfig:
+    settings = await _read_settings(db, user_id)
+    return SpacedRepetitionConfig(
+        learning_steps_minutes=list(settings.learning_steps_minutes),
+        graduating_interval_days=float(settings.graduating_interval_days),
+        strict_mode=settings.strict_mode,
+    )
+
+
+def _preset_id(settings: GameSettingsUpdate) -> str:
+    return next(
+        (p.id for p in list_game_settings_presets() if p.settings == settings), "custom"
+    )
 
 
 # The fields shared by `WordProgress` (the row) and `WordProgressState` (what

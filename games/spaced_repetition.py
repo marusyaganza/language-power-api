@@ -7,16 +7,21 @@ from games.scoring import AnswerGrade
 
 @dataclass
 class SpacedRepetitionConfig:
+    """How words are scheduled. The defaults are the "recommended" preset.
+
+    `learning_steps_minutes`, `graduating_interval_days` and `strict_mode` can
+    be set per user (`games.service.update_game_settings`); the rest are fixed.
+    """
+
     learning_steps_minutes: list[int] = field(default_factory=lambda: [15, 1440, 8640])  # 15m, 1d, 6d
     # Never shorter than the last learning step: graduating must not bring
     # the next review closer than the step the word just passed.
-    graduating_interval_days: float = 1.0
+    graduating_interval_days: float = 6.0
     interval_growth_factor: float = 2.0       # multiplier on a correct answer
     close_growth_factor: float = 1.2          # smaller multiplier on a near-miss
     lapse_penalty_factor: float = 0.5         # interval shrink on a wrong answer, graduated word
     max_interval_days: float = 90.0
-    # TODO: expose as a per-game setting once the "edit game" modal exists.
-    # strict_mode=True would make WRONG on a graduated word drop back into
+    # strict_mode=True makes WRONG on a graduated word drop back into
     # learning_steps entirely, instead of just shrinking the interval —
     # closer to Anki's original behavior. Off by default: forgiving of
     # typos and slips is the better default for personal vocabulary practice.
@@ -60,6 +65,11 @@ def update_progress(
     now = datetime.now(UTC)
 
     if state.is_learning:
+        # The user may have removed learning steps since the word's last
+        # review; continue from the last step that still exists.
+        state.learning_step_index = min(
+            state.learning_step_index, len(config.learning_steps_minutes) - 1
+        )
         if grade == AnswerGrade.WRONG:
             state.learning_step_index = 0
             state.lapses += 1

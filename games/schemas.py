@@ -2,9 +2,10 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from words.schemas import ExampleItem
 from games.scoring import AnswerGrade
+from games.spaced_repetition import DEFAULT_CONFIG
 
 class GameMode(str, Enum):
     SPACED = "spaced"  # only words that are due
@@ -80,3 +81,42 @@ class GameResultOut(BaseModel):
     unanswered: int
     score_percent: int
     questions: list[QuestionResult]
+
+
+MAX_LEARNING_STEPS = 5
+# Fixed, not a user setting: no interval, including a learning step, is longer.
+MAX_INTERVAL_DAYS = int(DEFAULT_CONFIG.max_interval_days)
+
+
+class GameSettingsUpdate(BaseModel):
+    """The spaced-repetition settings a user can change."""
+
+    learning_steps_minutes: list[int] = Field(min_length=1, max_length=MAX_LEARNING_STEPS)
+    graduating_interval_days: int = Field(ge=1, le=MAX_INTERVAL_DAYS)
+    strict_mode: bool
+
+    @field_validator("learning_steps_minutes")
+    @classmethod
+    def steps_must_increase(cls, steps: list[int]) -> list[int]:
+        if any(step < 1 or step > MAX_INTERVAL_DAYS * 24 * 60 for step in steps):
+            raise ValueError(f"Each learning step must be between 1 minute and {MAX_INTERVAL_DAYS} days")
+        if any(later <= earlier for earlier, later in zip(steps, steps[1:])):
+            raise ValueError("Learning steps must get longer each time")
+        return steps
+
+    @model_validator(mode="after")
+    def graduating_not_shorter_than_last_step(self) -> "GameSettingsUpdate":
+        if self.graduating_interval_days * 24 * 60 < self.learning_steps_minutes[-1]:
+            raise ValueError("The graduating interval cannot be shorter than the last learning step")
+        return self
+
+
+class GameSettingsOut(GameSettingsUpdate):
+    preset: str  # id of the preset these values match, or "custom"
+
+
+class GameSettingsPreset(BaseModel):
+    id: str
+    title: str
+    description: str
+    settings: GameSettingsUpdate

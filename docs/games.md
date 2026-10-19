@@ -271,17 +271,89 @@ picked in random order.
 
 ### How the schedule moves
 
-This is the learning schedule from Anki, as its users commonly configure it:
+Each user's schedule follows their [settings](#spaced-repetition-settings).
+With the default ("Recommended") settings:
 
 - **A new word** comes back after 15 minutes, then 1 day, then 6 days. A
   correct answer moves it a step forward. A wrong answer sends it back to
-  15 minutes. A close answer repeats the current step.
-- **After the 6-day step**, a correct answer doubles the interval (up to 90
-  days). A close answer grows it a little. A wrong answer halves it (at least
-  1 day).
+  the first step. A close answer repeats the current step.
+- **After the last step the word "graduates"** and comes back after 6 days.
+  From then on, a correct answer doubles the interval (up to 90 days). A
+  close answer grows it a little. A wrong answer halves it (at least 1 day),
+  or, in strict mode, sends the word back to the first learning step.
 
 Progress is saved just after the answer response is sent, so a `GET /games`
 made at the same moment may not reflect the last answer yet.
+
+---
+
+## Spaced repetition settings
+
+Each user can change how their words are scheduled. The settings apply to
+every game.
+
+### Endpoints
+
+- `GET /users/me/game-settings`: the user's settings. Users who never
+  changed them get the "Recommended" preset.
+- `PUT /users/me/game-settings`: replace them. The body has the three
+  settings and returns the same shape as `GET`.
+- `GET /users/me/game-settings/presets`: the presets to offer, the first
+  being the default.
+
+```json
+{
+  "learning_steps_minutes": [15, 1440, 8640],
+  "graduating_interval_days": 6,
+  "strict_mode": false,
+  "preset": "recommended"
+}
+```
+
+- `preset` is the id of the preset the values match, or `"custom"`. It is
+  only returned, never sent. To apply a preset, send its `settings`.
+
+Values are checked, and anything invalid is rejected with 422:
+
+| Setting | Allowed values |
+|---|---|
+| `learning_steps_minutes` | 1 to 5 steps, each between 1 minute and 90 days, each longer than the one before |
+| `graduating_interval_days` | Whole days from 1 to 90, and not shorter than the last learning step |
+| `strict_mode` | `true` or `false` |
+
+### Presets
+
+| Preset | Learning steps | Graduating interval | Strict | For |
+|---|---|---|---|---|
+| Recommended | 15 min, 1 day, 6 days | 6 days | off | Steady daily practice |
+| Intensive | 15 min, 4 hours, 1 day | 3 days | on | Fast progress, e.g. before an exam or a trip |
+| Relaxed | 1 day, 3 days | 7 days | off | Practicing a few times a week |
+
+Each preset comes with a `title` and a `description` to show.
+
+### When new settings take effect
+
+**Changing the settings never moves a review that's already scheduled.** Each
+word follows the new settings from its next answer on. If the user removes
+learning steps, a word on a removed step continues from the last remaining
+one.
+
+Suggested note for the settings screen:
+
+> Changes apply to each word the next time you answer it. Reviews that are
+> already scheduled keep their dates.
+
+### Suggested tooltips
+
+- **Learning steps:** "How soon a new word comes back while you're still
+  learning it. Each correct answer moves it to the next step. A wrong answer
+  starts it over."
+- **Graduating interval:** "How long to wait after the last learning step
+  before reviewing the word again. From then on, the wait grows with each
+  correct answer, up to 90 days."
+- **Strict mode:** "When on, forgetting a word you had already learned sends
+  it back to the first learning step. When off, the wait before its next
+  review is cut in half instead."
 
 ---
 
@@ -304,6 +376,7 @@ made at the same moment may not reflect the last answer yet.
 | 404 | Game doesn't exist. Session expired, never existed, or belongs to another user. The word isn't part of the session. |
 | 400 | The session was started for a different game than the one in the answer URL. |
 | 409 | Question already answered. Session already finished. Starting `select_word`/`select_def` with fewer words than `min_word_count`. |
+| 422 | Invalid request values, e.g. game settings out of range. |
 | 501 | The game exists but can't be played yet. All six games above are playable. |
 
 Errors have the shape `{"detail": "<message>"}`.
@@ -336,5 +409,13 @@ The choices behind the rules above, and the reasons for them.
   when the browser can't show the image (hotlink blocking), and would make
   the server request user-supplied addresses. The browser knows for certain
   whether an image loaded, so it handles the fallback with `alt`.
+- **Spaced repetition settings belong to the user, not the game.** Games are
+  shared by all users, and one set of settings keeps the settings screen
+  simple. Only three settings are exposed: the growth factors and the
+  90-day limit stay fixed, because they are hard to explain and easy to set
+  badly.
+- **Settings changes can't break scheduling.** Invalid values are rejected
+  when saved. Words keep working when steps are removed. If a stored value
+  is ever invalid, the defaults are used instead of failing.
 - **Finishing early is allowed.** A player in a hurry can stop. Skipped words
   keep their schedule.

@@ -1,7 +1,7 @@
 # games/models.py
 import enum
 from sqlalchemy import ForeignKey, UniqueConstraint, Column, DateTime, Boolean, Integer, String, Float, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.database import Base
@@ -70,3 +70,15 @@ class ReviewLog(Base):
     answered_at = Column(DateTime(timezone=True), server_default=func.now())
 
     progress = relationship("WordProgress", back_populates="review_logs", lazy="raise")
+
+
+class GameSettings(Base):
+    """A user's spaced-repetition settings. No row means the defaults."""
+
+    __tablename__ = "game_settings"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    learning_steps_minutes = Column(ARRAY(Integer), nullable=False)
+    graduating_interval_days = Column(Integer, nullable=False)
+    strict_mode = Column(Boolean, nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
