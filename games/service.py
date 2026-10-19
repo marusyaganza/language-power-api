@@ -253,10 +253,15 @@ def _audio_question(word: Word) -> QuestionOut:
 
 def _image_question(word: Word) -> QuestionOut:
     """image: type the name of what the picture shows. The picture is the
-    question, so the hints are the meaning and the pronunciation."""
+    question, so the hints are the meaning and the pronunciation.
+
+    `alt` is the first clue type_word would show, for when the image fails
+    to load: the game stays playable, and the user can see the image is broken.
+    """
     return QuestionOut(
         id=word.id,
         question=word.img_url,
+        alt=hidden_definitions(word.name, word.stems, word.defs)[0],
         additional_info=QuestionAdditionalInfo(
             audio_url=word.audio_url,
             examples=word.examples or None,

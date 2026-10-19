@@ -39,6 +39,7 @@ class QuestionOut(BaseModel):
     # (audio) or image (image) URL.
     question: list[str] | str
     options: list[str] | None = None  # multiple-choice games only
+    alt: str | None = None  # image game only: a text clue if the image fails to load
     additional_info: QuestionAdditionalInfo
 
 class GameSessionOut(BaseModel):
