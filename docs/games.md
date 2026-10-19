@@ -13,12 +13,15 @@ All game endpoints require a logged-in user (the session cookie set by
 
 | Game type | Title | Question | Player answers by | Words it can use |
 |---|---|---|---|---|
-| `type_word` | WordRecall | Up to 3 definitions | Typing the word | All |
-| `audio` | WordEcho | Pronunciation audio URL | Typing the word | Words with audio |
-| `image` | PictureWord Blitz | Image URL | Typing the word | Words with an image |
-| `select_word` | Definify | Up to 3 definitions | Picking the word from 4 options | All |
-| `select_def` | LexiSense | The word | Picking its definition from 4 options | All |
-| `gender` | GenderWord Challenge | The word (a noun) | Ticking masculine, feminine, or both | Words with a gender (Spanish only) |
+| `select_def` | Pick the Meaning | The word | Picking its definition from 4 options | All |
+| `select_word` | Pick the Word | Up to 3 definitions | Picking the word from 4 options | All |
+| `type_word` | Type the Word | Up to 3 definitions | Typing the word | All |
+| `audio` | Listen & Type | Pronunciation audio URL | Typing the word | Words with audio |
+| `image` | Name the Picture | Image URL | Typing the word | Words with an image |
+| `gender` | Noun Gender | The word (a noun) | Ticking masculine, feminine, or both | Words with a gender (Spanish only) |
+
+The games are listed from easiest to hardest: first recognising a word among
+options, then recalling it without help.
 
 A game session has 5 questions by default. If the user has fewer eligible
 words, the session has fewer questions.
@@ -45,10 +48,10 @@ counts for each:
 ```json
 [
   {
-    "id": 4,
-    "slug": "word-recall",
-    "title": "WordRecall",
-    "description": "Type words matching given definitions...",
+    "id": 27,
+    "slug": "type-the-word",
+    "title": "Type the Word",
+    "description": "Read a definition and type the word from memory.",
     "game_type": "type_word",
     "total_word_count": 40,
     "due_word_count": 3,
@@ -88,7 +91,7 @@ Response:
 
 ```json
 {
-  "task": "Type a word that means ",
+  "task": "Type the word that matches this meaning",
   "session_id": "2f56b64e-567c-49b6-aafa-aca946bf37c4",
   "questions": [
     {
@@ -107,8 +110,8 @@ Response:
 }
 ```
 
-- `task` is the instruction to show. Some tasks end with a space and are
-  meant to be followed by the question (e.g. "Select a word that means ").
+- `task` is the instruction to show as the game's heading, with the
+  question below it. Never join the two.
 - `id` of a question is the word's id. Send it back as `word_id` when
   answering.
 - `question` is a **list of strings** (definitions) or a **single string**
@@ -245,7 +248,7 @@ unanswered. After that:
 ## Modes
 
 Progress is tracked **per word and per game type**. Practicing a word in the
-audio game doesn't change when it is due in WordRecall.
+audio game doesn't change when it is due in Type the Word.
 
 ### Spaced repetition (`mode=spaced`, the default)
 

@@ -16,13 +16,14 @@ GAME_ANSWER_TYPES = {
     "gender": "gender",  # "masculine" / "feminine" / "both", with partial credit
 }
 
+# Shown as the heading of a game, above the question (never joined to it).
 GAME_TASKS = {
-    "audio": "Type the word that you've heard",
-    "select_def": "Select a definition that means ",
-    "select_word": "Select a word that means ",
-    "type_word": "Type a word that means ",
-    "image": "Type the name of the object shown in the picture.",
-    "gender": "Pick the Correct Gender",
+    "select_def": "Pick the meaning of this word",
+    "select_word": "Pick the word that matches this meaning",
+    "type_word": "Type the word that matches this meaning",
+    "audio": "Type the word you hear",
+    "image": "Type the word for this picture",
+    "gender": "Pick this noun's gender",
 }
 # Spaced-repetition presets a user can pick from. "recommended" is what users
 # get until they change their settings; keep it equal to the defaults of
