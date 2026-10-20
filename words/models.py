@@ -28,6 +28,7 @@ class Word(Base):
     audio_url = Column(String, nullable=True)
     transcription = Column(String, nullable=True)
     img_url = Column(String, nullable=True)
+    img_desc = Column(String, nullable=True)  # caption of img_url
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

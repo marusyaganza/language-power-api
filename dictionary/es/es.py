@@ -5,7 +5,7 @@ from words.word import Word, unique_definitions
 from dictionary.base import SearchResult
 import httpx
 from settings import settings
-from dictionary.helpers.mw import format_name, extract_audio, extract_image, extract_definitions, has_definitions, is_suggestion_response, extract_gender
+from dictionary.helpers.mw import format_name, extract_audio, extract_image, extract_image_desc, extract_definitions, has_definitions, is_suggestion_response, extract_gender
 
 class SpanishDictionaryProvider(DictionaryProvider):
     async def fetch(self, query: str) -> SearchResult:
@@ -31,6 +31,7 @@ class SpanishDictionaryProvider(DictionaryProvider):
         audio_url = extract_audio(word, language, 'me')
         examples = extract_examples(word)
         img_url = extract_image(word)
+        img_desc = extract_image_desc(word)
         gender = extract_gender(fl)
 
-        return Word(name=name, language=language, uuid=uuid, stems=stems, fl=fl, defs=defs, audio_url = audio_url, examples = examples, gender = gender, img_url = img_url)
+        return Word(name=name, language=language, uuid=uuid, stems=stems, fl=fl, defs=defs, audio_url = audio_url, examples = examples, gender = gender, img_url = img_url, img_desc = img_desc)

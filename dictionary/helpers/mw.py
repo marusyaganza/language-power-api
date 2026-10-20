@@ -85,6 +85,14 @@ def extract_image(word) -> str | None:
     artid = (word.get('art') or {}).get('artid')
     return f'{ART_URL}/{artid}.gif' if artid else None
 
+def extract_image_desc(word) -> str | None:
+    """The caption of the entry's illustration ("wheel 1: 1 hub, 2 spoke, ..."),
+    or None if it has no illustration or an empty caption."""
+    art = word.get('art') or {}
+    if not art.get('artid'):
+        return None
+    return _definition_text(art.get('capt') or '') or None
+
 def _format_example(example):
     t = strip_mw_markup(example.get('t'))
     tr = example.get('tr', None)

@@ -29,10 +29,11 @@ class Word:
     audio_url: str | None
     transcription:str
     img_url: str | None
+    img_desc: str | None
     examples: list[Example]
     gender: str | None  # "masculine" | "feminine" | "both" | None
 
-    def __init__(self, *, name, defs, language, stems, uuid, fl, audio_url=None, transcription=None, examples=[], img_url=None, gender=None):
+    def __init__(self, *, name, defs, language, stems, uuid, fl, audio_url=None, transcription=None, examples=[], img_url=None, img_desc=None, gender=None):
         self.name = name
         self.stems = stems
         self.defs = defs
@@ -43,6 +44,7 @@ class Word:
         self.transcription = transcription
         self.examples = examples
         self.img_url = img_url
+        self.img_desc = img_desc
         self.gender = gender
     def __repr__(self):
         # data = {k:v for k,v in self.__dict__.items()}

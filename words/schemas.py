@@ -30,6 +30,7 @@ class WordCreate(BaseModel):
     audio_url: OptionalStr = None
     transcription: OptionalStr = None
     img_url: OptionalStr = None
+    img_desc: OptionalStr = None
     gender: OptionalGender = None
     examples: list[ExampleItem] = []
 
@@ -53,6 +54,7 @@ class WordOut(BaseModel):
     audio_url: OptionalStr
     transcription: OptionalStr
     img_url: OptionalStr
+    img_desc: OptionalStr
     examples: list[ExampleItem]
     saved: bool = False
     gender: Gender | None = None
@@ -86,10 +88,13 @@ class WordUpdate(BaseModel):
     examples: list[ExampleUpdate] | None = None
     audio_url: OptionalStr = None
     img_url: OptionalStr = None
+    img_desc: OptionalStr = None
 
     @field_validator("defs")
     @classmethod
     def defs_must_be_non_blank(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
         cleaned = [item.strip() for item in value if item and item.strip()]
         if not cleaned:
             raise ValueError("Definitions must contain at least one non-empty string")

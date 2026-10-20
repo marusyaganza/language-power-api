@@ -143,6 +143,7 @@ async def save_word(db: AsyncSession, user_id: int, payload: WordCreate) -> Word
         audio_url=payload.audio_url,
         transcription=payload.transcription,
         img_url=payload.img_url,
+        img_desc=payload.img_desc,
         gender=payload.gender,
         examples=_to_examples(payload.examples),
     )
@@ -164,22 +165,32 @@ async def update_word(
 ) -> Word:
     """Apply a partial edit to one of the user's saved words.
 
-    Only `defs`, `audio_url`, `img_url` and `examples` can be edited. A field
-    that is `None` in `payload` is left unchanged, so these edits cannot set
-    `defs`, `audio_url` or `img_url` back to `None`. `examples`, when given,
-    replaces the whole list (an empty list removes every example).
+    Only `defs`, `audio_url`, `img_url`, `img_desc` and `examples` can be
+    edited. A field missing from the request is left unchanged. Sent as null
+    (or an empty string), `audio_url`, `img_url` and `img_desc` are cleared,
+    while `defs` and `examples` are left unchanged: a word always has
+    definitions. `examples`, when given, replaces the whole list (an empty
+    list removes every example).
+
+    Changing `img_url` without sending `img_desc` clears the old description,
+    which described the previous image.
 
     Raises:
         WordNotFoundError: the user has no saved word with this id.
     """
     word = await _get_owned_word(db, user_id, word_id)
+    sent = payload.model_fields_set
 
     if payload.defs is not None:
         word.defs = payload.defs
-    if payload.audio_url is not None:
+    if "audio_url" in sent:
         word.audio_url = payload.audio_url
-    if payload.img_url is not None:
+    if "img_url" in sent and payload.img_url != word.img_url:
         word.img_url = payload.img_url
+        if "img_desc" not in sent:
+            word.img_desc = None
+    if "img_desc" in sent:
+        word.img_desc = payload.img_desc
     if payload.examples is not None:
         # The old rows are deleted by cascade="all, delete-orphan" on
         # Word.examples (models.py), so reassigning the list is enough.

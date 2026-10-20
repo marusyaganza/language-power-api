@@ -1,7 +1,7 @@
 import httpx
 from words.language import Language
 from dictionary.base import DictionaryProvider
-from dictionary.helpers.mw import extract_examples, extract_audio, extract_image, extract_transcription, format_name, extract_definitions, has_definitions, is_suggestion_response
+from dictionary.helpers.mw import extract_examples, extract_audio, extract_image, extract_image_desc, extract_transcription, format_name, extract_definitions, has_definitions, is_suggestion_response
 from words.word import Word, unique_definitions
 from dictionary.base import SearchResult
 from settings import settings
@@ -33,8 +33,9 @@ class EnglishDictionaryProvider(DictionaryProvider):
         transcription = extract_transcription(word)
         examples = extract_examples(word)
         img_url = extract_image(word)
+        img_desc = extract_image_desc(word)
 
-        return Word(name=name, language=language, uuid=uuid, stems=stems, fl=fl, defs=defs, audio_url = audio_url, transcription = transcription, examples = examples, img_url = img_url)
+        return Word(name=name, language=language, uuid=uuid, stems=stems, fl=fl, defs=defs, audio_url = audio_url, transcription = transcription, examples = examples, img_url = img_url, img_desc = img_desc)
 
 
 
