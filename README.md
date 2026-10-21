@@ -46,3 +46,12 @@ docker exec -it <your-redis-container-name> redis-cli
 
 > KEYS game_session:\*
 > GET game_session:<the-session-id-you're-testing-with>
+
+## Tests
+
+```
+pip install -r requirements-dev.txt
+pytest                 # run all tests
+pytest tests/unit      # unit tests only (no DB or Redis needed)
+pytest --cov           # with a coverage report (config in .coveragerc)
+```

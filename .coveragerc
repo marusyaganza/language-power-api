@@ -1,0 +1,13 @@
+[run]
+source = .
+omit =
+    tests/*
+    venv/*
+    .venv/*
+    alembic/*
+    games/seed.py
+    create_mocks.py
+
+[report]
+show_missing = true
+skip_empty = true
