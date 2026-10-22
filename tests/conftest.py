@@ -16,6 +16,12 @@ os.environ.update({
     "ENGLISH_API_URL": "https://mw-api.invalid",
     "AUDIO_ENDPOINT": "https://mw-media.invalid/audio",
     "IMG_ENDPOINT": "https://mw-media.invalid/img",
+    # The app (and Alembic) only ever see the test database, so no test can
+    # reach the dev data. tests/api/conftest.py recreates it on every run.
+    "DATABASE_URL": os.environ.get(
+        "TEST_DATABASE_URL",
+        "postgresql+psycopg://app_user:dev_password@localhost:5432/language_app_test",
+    ),
 })
 
 from dictionary.en.mock import MockEnglishDictionaryProvider  # noqa: E402

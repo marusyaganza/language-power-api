@@ -1,5 +1,8 @@
 [run]
 source = .
+# SQLAlchemy's async layer runs DB code in greenlets; without this,
+# lines after an `await` on the database are reported as missed.
+concurrency = greenlet, thread
 omit =
     tests/*
     venv/*

@@ -23,8 +23,7 @@ class GameOut(BaseModel):
     next_due_at: datetime | None  # earliest due date of words not due yet
     min_word_count: int  # words needed to start the game
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 class QuestionAdditionalInfo(BaseModel):
     audio_url: str | None = None
