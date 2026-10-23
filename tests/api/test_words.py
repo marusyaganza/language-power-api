@@ -1,6 +1,8 @@
 # tests/api/test_words.py
 import pytest
 
+from dictionary.base import DictionaryError, DictionaryProvider
+from dictionary.providers import PROVIDERS
 from tests.api.conftest import save_word, signup
 
 pytestmark = pytest.mark.anyio
@@ -152,3 +154,15 @@ async def test_search_without_mock_data_lists_the_queries_that_have_it(client):
 async def test_search_in_an_unsupported_language(client):
     response = await client.get("/words/search", params={"query": "x", "language": "xx"})
     assert response.status_code == 400
+
+
+class _BrokenProvider(DictionaryProvider):
+    async def fetch(self, query):
+        raise DictionaryError("MW answered with status 500")
+
+
+async def test_search_when_the_dictionary_fails_is_a_503(client, monkeypatch):
+    monkeypatch.setitem(PROVIDERS, "en", _BrokenProvider())
+    response = await client.get("/words/search", params={"query": "heart", "language": "en"})
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Dictionary is unavailable, try again later"}

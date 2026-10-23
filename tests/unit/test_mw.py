@@ -4,6 +4,7 @@ import asyncio
 import httpx
 import pytest
 
+from dictionary.base import DictionaryError
 from dictionary.helpers.mw import extract_gender, fetch_entries
 
 API_URL = "https://mw-api.invalid/api/v3/references/collegiate/json"
@@ -27,7 +28,22 @@ def test_extract_gender(fl, expected):
 
 
 @pytest.fixture
-def requests(monkeypatch):
+def serve(monkeypatch):
+    """Answer `fetch_entries`' requests with a handler instead of the network."""
+    real_client = httpx.AsyncClient
+
+    def _serve(handler):
+        monkeypatch.setattr(
+            httpx,
+            "AsyncClient",
+            lambda **kwargs: real_client(transport=httpx.MockTransport(handler), **kwargs),
+        )
+
+    return _serve
+
+
+@pytest.fixture
+def requests(serve):
     """Record the requests `fetch_entries` sends, answering each with `[]`."""
     sent: list[httpx.Request] = []
 
@@ -35,10 +51,7 @@ def requests(monkeypatch):
         sent.append(request)
         return httpx.Response(200, json=[])
 
-    real_client = httpx.AsyncClient
-    monkeypatch.setattr(
-        httpx, "AsyncClient", lambda: real_client(transport=httpx.MockTransport(handler))
-    )
+    serve(handler)
     return sent
 
 
@@ -64,3 +77,32 @@ def test_query_is_one_encoded_path_segment(requests, query, segment):
 def test_query_of_only_dots_makes_no_request(requests, query):
     assert asyncio.run(fetch_entries(API_URL, "secret", query)) == []
     assert requests == []
+
+
+def _raise(exc_type):
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise exc_type("boom", request=request)
+    return handler
+
+
+# Regression: every one of these was an unhandled 500.
+@pytest.mark.parametrize(
+    "handler",
+    [
+        lambda request: httpx.Response(500, text="Internal Server Error"),
+        lambda request: httpx.Response(403, text="Forbidden"),
+        # What MW sends for a bad key: status 200, plain text.
+        lambda request: httpx.Response(200, text="Invalid API key. Not subscribed for this reference."),
+        lambda request: httpx.Response(200, json={"error": "unexpected"}),
+        _raise(httpx.ReadTimeout),
+        _raise(httpx.ConnectError),
+    ],
+    ids=["500", "403", "plain-text", "json-object", "timeout", "connect-error"],
+)
+def test_mw_failures_raise_dictionary_error_without_the_key(serve, handler):
+    serve(handler)
+    with pytest.raises(DictionaryError) as excinfo:
+        asyncio.run(fetch_entries(API_URL, "secret", "casa"))
+    # httpx's own messages contain the URL, and the URL contains the key.
+    assert "secret" not in str(excinfo.value)
+    assert excinfo.value.__cause__ is None

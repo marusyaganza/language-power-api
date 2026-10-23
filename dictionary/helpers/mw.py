@@ -3,10 +3,14 @@ from urllib.parse import quote
 
 import httpx
 
+from dictionary.base import DictionaryError
 from words.example import Example
 from settings import settings
 
 TAG_RE = re.compile(r'\{[^}]*\}')
+# Seconds to wait for MW; well under the frontend proxy's own timeout.
+REQUEST_TIMEOUT_SECONDS = 10
+
 # Direct link to an illustration, by the `art.artid` of an entry (MW API docs, "art").
 ART_URL = 'https://www.merriam-webster.com/assets/mw/static/art/dict'
 
@@ -18,12 +22,33 @@ async def fetch_entries(api_url: str, api_key: str, query: str) -> list:
     key out of the query string. A query of only dots would still be read as
     "." or ".." in the path, and nothing else is a word, so it returns no
     entries without a request.
+
+    MW answers an unknown word with an empty list or spelling suggestions,
+    so anything other than a JSON list is a failure. A bad key, for example,
+    comes back as plain text.
+
+    Raises:
+        DictionaryError: MW is unreachable, timed out, or answered with an
+            error status or something other than a JSON list. The error
+            names only the kind of failure: httpx's own messages include the
+            URL, and the URL includes the API key.
     """
     if not query.strip("."):
         return []
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{api_url}/{quote(query, safe='')}", params={"key": api_key})
-        return resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as client:
+            resp = await client.get(f"{api_url}/{quote(query, safe='')}", params={"key": api_key})
+    except httpx.HTTPError as exc:
+        raise DictionaryError(f"MW request failed: {type(exc).__name__}") from None
+    if resp.status_code != 200:
+        raise DictionaryError(f"MW answered with status {resp.status_code}")
+    try:
+        data = resp.json()
+    except ValueError:
+        raise DictionaryError("MW answered with something other than JSON") from None
+    if not isinstance(data, list):
+        raise DictionaryError(f"MW answered with a JSON {type(data).__name__}, not a list")
+    return data
 
 def strip_mw_markup(raw: str) -> str:
     return TAG_RE.sub('', raw).strip()

@@ -18,6 +18,7 @@ Rules that apply to every function below:
 * Nothing here knows about games. Filters are phrased in terms of what a word
   has (audio, image, gender), and callers decide which of those they need.
 """
+import logging
 from math import ceil
 
 from sqlalchemy import Select, select
@@ -25,7 +26,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from dictionary.base import SearchResult
+from dictionary.base import DictionaryError, SearchResult
 from dictionary.providers import PROVIDERS
 from words.models import Example, Word
 from words.repository import get_saved_uuids, get_vocabulary
@@ -38,10 +39,13 @@ from words.schemas import (
     WordUpdate,
 )
 
+logger = logging.getLogger(__name__)
+
 __all__ = [
     "WordsError",
     "UnsupportedLanguageError",
     "DefinitionNotFoundError",
+    "DictionaryUnavailableError",
     "WordNotFoundError",
     "WordAlreadySavedError",
     "VOCABULARY_PAGE_SIZE",
@@ -73,6 +77,10 @@ class DefinitionNotFoundError(WordsError):
     """The dictionary has no entry at all for the searched text."""
 
 
+class DictionaryUnavailableError(WordsError):
+    """The dictionary could not be used right now; the search may work later."""
+
+
 class WordNotFoundError(WordsError):
     """The user has no saved word with the given id."""
 
@@ -101,12 +109,18 @@ async def search_words(
     Raises:
         UnsupportedLanguageError: there is no provider for `language`.
         DefinitionNotFoundError: the dictionary returned nothing at all.
+        DictionaryUnavailableError: the dictionary failed (unreachable, timed
+            out, or an error response). The cause is logged, not returned.
     """
     provider = PROVIDERS.get(language)
     if provider is None:
         raise UnsupportedLanguageError(f"Unsupported language: {language}")
 
-    results = await provider.fetch(query)
+    try:
+        results = await provider.fetch(query)
+    except DictionaryError as exc:
+        logger.warning("Dictionary lookup failed for language=%s: %s", language, exc)
+        raise DictionaryUnavailableError("Dictionary is unavailable, try again later") from exc
     if results.is_empty:
         raise DefinitionNotFoundError("Word not found")
     if not results.words:

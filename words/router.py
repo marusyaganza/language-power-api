@@ -27,6 +27,7 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 _STATUS_FOR_ERROR: dict[type[service.WordsError], int] = {
     service.UnsupportedLanguageError: status.HTTP_400_BAD_REQUEST,
     service.DefinitionNotFoundError: status.HTTP_404_NOT_FOUND,
+    service.DictionaryUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
     service.WordNotFoundError: status.HTTP_404_NOT_FOUND,
     service.WordAlreadySavedError: status.HTTP_409_CONFLICT,
 }
@@ -57,7 +58,8 @@ async def search_words(
 ):
     """Search the dictionary, flagging words the user has already saved.
 
-    400 if the language is unsupported, 404 if the dictionary has no entry.
+    400 if the language is unsupported, 404 if the dictionary has no entry,
+    503 if the dictionary itself failed (worth retrying later).
     Spelling suggestions are a normal 200 response.
     """
     with _http_errors():

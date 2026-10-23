@@ -24,7 +24,20 @@ class SearchResult:
         return not (self.words or self.suggestions or self.mock_queries)
 
 
+class DictionaryError(Exception):
+    """The dictionary could not be reached or did not answer usably.
+
+    Not raised for a word the dictionary does not know: that is an empty
+    `SearchResult`. The message is safe to log and never contains credentials.
+    """
+
+
 class DictionaryProvider(ABC):
     @abstractmethod
     async def fetch(self, query: str) -> SearchResult:
-        """Look `query` up and return the entries or suggestions."""
+        """Look `query` up and return the entries or suggestions.
+
+        Raises:
+            DictionaryError: the dictionary is unreachable, timed out, or
+                answered with an error or an unexpected response.
+        """
