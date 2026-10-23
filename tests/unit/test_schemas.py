@@ -2,6 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
+from auth.schemas import LoginRequest, UserCreate
 from games.schemas import GameSettingsUpdate
 from words.schemas import ExampleUpdate, WordCreate, WordUpdate
 
@@ -81,3 +82,21 @@ def test_valid_settings():
 def test_invalid_settings_are_rejected(fields):
     with pytest.raises(ValidationError):
         settings(**fields)
+
+
+# --------------------------------------------------------------------------- #
+# Auth
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.parametrize("schema", [UserCreate, LoginRequest])
+def test_password_up_to_72_bytes_is_accepted(schema):
+    assert schema(email="a@example.com", password="a" * 72).password == "a" * 72
+
+
+# Regression: bcrypt 5 raises on passwords over 72 bytes, which was a 500.
+# "é" is two bytes, so 37 of them are 74 bytes but only 37 characters.
+@pytest.mark.parametrize("schema", [UserCreate, LoginRequest])
+@pytest.mark.parametrize("password", ["a" * 73, "é" * 37])
+def test_password_over_72_bytes_is_rejected(schema, password):
+    with pytest.raises(ValidationError):
+        schema(email="a@example.com", password=password)

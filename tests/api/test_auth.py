@@ -40,6 +40,19 @@ async def test_unknown_email_gets_the_same_error_as_a_wrong_password(make_client
     assert response.status_code == 401
 
 
+async def test_password_too_long_for_bcrypt_is_a_422_not_a_500(make_client):
+    client = make_client()
+    long_password = "a" * 73
+    signup_response = await client.post(
+        "/auth/signup", json={"email": "long@example.com", "password": long_password}
+    )
+    assert signup_response.status_code == 422
+    login_response = await client.post(
+        "/auth/login", json={"email": "long@example.com", "password": long_password}
+    )
+    assert login_response.status_code == 422
+
+
 async def test_signup_rejects_a_taken_email(make_client):
     user = await signup(make_client())
     again = await make_client().post("/auth/signup", json={"email": user["email"], "password": "x"})
