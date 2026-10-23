@@ -1,15 +1,13 @@
 """HTTP interface for the games module.
 
 Handlers only translate between HTTP and `games.service`: they read the
-request, pass in the acting user, schedule background work, and map service
-errors to status codes. What each operation does is documented on the service
+request, pass in the acting user, and map service errors to status codes. What each operation does is documented on the service
 functions.
 """
 from contextlib import contextmanager
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     HTTPException,
     Query,
@@ -101,15 +99,16 @@ async def start_game_session(
 async def submit_answer(
     game_id: int,
     payload: AnswerRequest,
-    background_tasks: BackgroundTasks,
     user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Grade an answer in a running game session.
 
     404 if the session expired, belongs to another user, or has no such
     question, 400 if the session belongs to another game, 409 if the session
     is finished or the question was already answered. The learning progress
-    is saved after the response has been sent.
+    is saved before the response is sent; a failure to save it is logged, not
+    reported, since the answer has already been graded.
     """
     with _http_errors():
         check = await service.check_answer(
@@ -120,8 +119,8 @@ async def submit_answer(
             answer=payload.answer,
         )
 
-    background_tasks.add_task(
-        service.persist_review_result,
+    await service.persist_review_result(
+        db,
         user_id=user.id,
         word_id=payload.word_id,
         game_type=check.game_type,

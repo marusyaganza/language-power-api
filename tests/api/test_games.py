@@ -86,7 +86,7 @@ async def test_answer_is_graded_and_progress_saved(client, db, games):
     assert response.status_code == 200, response.text
     assert response.json() == {"grade": "correct", "correct_answer": None, "session_complete": True}
 
-    # The background task has run by the time the in-process client returns.
+    # Progress is saved before the response is returned.
     progress = await db.scalar(select(WordProgress).where(WordProgress.word_id == word["id"]))
     assert progress is not None
     assert progress.game_type == "type_word"

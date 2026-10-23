@@ -9,7 +9,6 @@
   normally and nothing is left behind.
 * Redis: database 15, flushed after each test, so dev keys are never touched.
 """
-import functools
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -25,7 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 import auth.service
-import games.service
 import games.session_store
 from core.database import AsyncSessionLocal, get_db
 from main import app
@@ -68,19 +66,16 @@ def _migrated_database():
 
 
 @pytest.fixture
-async def db(_migrated_database, monkeypatch) -> AsyncIterator[AsyncSession]:
+async def db(_migrated_database) -> AsyncIterator[AsyncSession]:
     """A session inside a transaction that is rolled back after the test.
 
-    Sessions the app opens itself (background tasks) join the same transaction.
+    `make_client` hands it to the app as the request session, so commits in
+    service code only release a savepoint.
     """
     engine = create_async_engine(settings.database_url, poolclass=NullPool)
     async with engine.connect() as conn:
         outer = await conn.begin()
-        factory = functools.partial(
-            AsyncSessionLocal, bind=conn, join_transaction_mode="create_savepoint"
-        )
-        monkeypatch.setattr(games.service, "AsyncSessionLocal", factory)
-        session = factory()
+        session = AsyncSessionLocal(bind=conn, join_transaction_mode="create_savepoint")
         try:
             yield session
         finally:

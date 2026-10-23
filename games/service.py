@@ -31,7 +31,6 @@ from pydantic import ValidationError
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.database import AsyncSessionLocal
 from games.constants import (
     GAME_ANSWER_TYPES,
     GAME_SETTINGS_PRESETS,
@@ -645,7 +644,7 @@ def _percent_half_up(part: int, total: int) -> int:
 # --------------------------------------------------------------------------- #
 
 async def persist_review_result(
-    user_id: int, word_id: int, game_type: str, grade: AnswerGrade
+    db: AsyncSession, user_id: int, word_id: int, game_type: str, grade: AnswerGrade
 ) -> None:
     """Log a review of a word and, if the word was due, update its schedule.
 
@@ -657,45 +656,42 @@ async def persist_review_result(
     possible in review mode) is logged and moves `last_reviewed_at`, but leaves
     the schedule alone, so extra practice cannot push a word into the future.
 
-    Intended to run as a background task after the answer has been returned,
-    so it opens its own database session (the request's is already closed).
-    Failures are logged and swallowed, because the user has already received
-    their answer and there is nobody to report the error to.
+    Called after `check_answer` has marked the question answered, so the
+    answer cannot be resubmitted. Failures are therefore logged and swallowed:
+    the user still gets their grade, and only this review's progress is lost.
+    Nothing is committed on failure; the request's session rolls it back.
     """
-    # The try wraps the session too, so a failure to connect is logged like
-    # any other. Leaving the block without committing rolls back.
     try:
-        async with AsyncSessionLocal() as db:
-            progress = await db.scalar(
-                select(WordProgress).where(
-                    WordProgress.word_id == word_id,
-                    WordProgress.game_type == game_type,
-                )
+        progress = await db.scalar(
+            select(WordProgress).where(
+                WordProgress.word_id == word_id,
+                WordProgress.game_type == game_type,
             )
-            now = datetime.now(UTC)
-            if progress is None:
-                progress = WordProgress(word_id=word_id, game_type=game_type)
-                _write_state(progress, initialize_progress())
-                db.add(progress)
-                await db.flush()  # assigns progress.id for the ReviewLog FK below
-                is_due = True
-            else:
-                is_due = progress.next_review_date <= now
+        )
+        now = datetime.now(UTC)
+        if progress is None:
+            progress = WordProgress(word_id=word_id, game_type=game_type)
+            _write_state(progress, initialize_progress())
+            db.add(progress)
+            await db.flush()  # assigns progress.id for the ReviewLog FK below
+            is_due = True
+        else:
+            is_due = progress.next_review_date <= now
 
-            interval_at_review = progress.interval_days
-            if is_due:
-                config = await _load_config(db, user_id)
-                _write_state(progress, update_progress(_read_state(progress), grade, config))
-            progress.last_reviewed_at = now
+        interval_at_review = progress.interval_days
+        if is_due:
+            config = await _load_config(db, user_id)
+            _write_state(progress, update_progress(_read_state(progress), grade, config))
+        progress.last_reviewed_at = now
 
-            db.add(
-                ReviewLog(
-                    progress=progress,
-                    grade=grade.value,
-                    interval_at_review=interval_at_review,
-                )
+        db.add(
+            ReviewLog(
+                progress=progress,
+                grade=grade.value,
+                interval_at_review=interval_at_review,
             )
-            await db.commit()
+        )
+        await db.commit()
     except Exception:
         logger.exception(
             "Failed to persist review result for word_id=%s, game_type=%s",
