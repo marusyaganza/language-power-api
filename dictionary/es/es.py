@@ -3,9 +3,8 @@ from words.language import Language
 from dictionary.base import DictionaryProvider
 from words.word import Word, unique_definitions
 from dictionary.base import SearchResult
-import httpx
 from settings import settings
-from dictionary.helpers.mw import format_name, extract_audio, extract_image, extract_image_desc, extract_definitions, has_definitions, is_suggestion_response, extract_gender
+from dictionary.helpers.mw import fetch_entries, format_name, extract_audio, extract_image, extract_image_desc, extract_definitions, has_definitions, is_suggestion_response, extract_gender
 
 class SpanishDictionaryProvider(DictionaryProvider):
     async def fetch(self, query: str) -> SearchResult:
@@ -15,10 +14,7 @@ class SpanishDictionaryProvider(DictionaryProvider):
        return SearchResult(words=[self._format(item) for item in raw_items if has_definitions(item)])
     
     async def _fetch_raw(self, query: str) -> list:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{settings.spanish_api_url}/{query}?key={settings.spanish_api_key}")
-            data = resp.json()
-        return data
+        return await fetch_entries(settings.spanish_api_url, settings.spanish_api_key, query)
     
     def _format(self, word):
         meta = word['meta']

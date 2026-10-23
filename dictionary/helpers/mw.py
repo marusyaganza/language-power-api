@@ -1,10 +1,29 @@
 import re
+from urllib.parse import quote
+
+import httpx
+
 from words.example import Example
 from settings import settings
 
 TAG_RE = re.compile(r'\{[^}]*\}')
 # Direct link to an illustration, by the `art.artid` of an entry (MW API docs, "art").
 ART_URL = 'https://www.merriam-webster.com/assets/mw/static/art/dict'
+
+async def fetch_entries(api_url: str, api_key: str, query: str) -> list:
+    """Request one MW reference's JSON for `query`.
+
+    The query is one path segment, so it is percent-encoded completely: "/",
+    "?" and "#" in a search must not change which URL is called or push the
+    key out of the query string. A query of only dots would still be read as
+    "." or ".." in the path, and nothing else is a word, so it returns no
+    entries without a request.
+    """
+    if not query.strip("."):
+        return []
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"{api_url}/{quote(query, safe='')}", params={"key": api_key})
+        return resp.json()
 
 def strip_mw_markup(raw: str) -> str:
     return TAG_RE.sub('', raw).strip()
