@@ -100,3 +100,25 @@ def test_password_up_to_72_bytes_is_accepted(schema):
 def test_password_over_72_bytes_is_rejected(schema, password):
     with pytest.raises(ValidationError):
         schema(email="a@example.com", password=password)
+
+
+@pytest.mark.parametrize("password", ["a" * 8, "é" * 8])  # characters, not bytes
+def test_new_password_of_8_characters_is_accepted(password):
+    assert UserCreate(email="a@example.com", password=password).password == password
+
+
+def test_new_password_under_8_characters_is_rejected():
+    with pytest.raises(ValidationError):
+        UserCreate(email="a@example.com", password="a" * 7)
+
+
+def test_login_has_no_minimum_password_length():
+    # A short password just fails to match; login does not reveal the rule.
+    assert LoginRequest(email="a@example.com", password="nope").password == "nope"
+
+
+@pytest.mark.parametrize("schema", [UserCreate, LoginRequest])
+def test_email_is_trimmed_and_lowercased(schema):
+    user = schema(email="  Foo.Bar@Example.COM ", password="a" * 8)
+    assert user.email == "foo.bar@example.com"
+

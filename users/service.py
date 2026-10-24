@@ -63,5 +63,9 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
 
 
 async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
-    """Return the user with this email, or None. The match is exact (case-sensitive)."""
+    """Return the user with this email, or None.
+
+    The match is exact. Stored emails are lowercase, so pass `email` already
+    lowercased, as `auth.schemas` does for every request.
+    """
     return await db.scalar(select(User).where(User.email == email))

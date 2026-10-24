@@ -1,7 +1,9 @@
 # tests/api/test_auth.py
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from settings import settings
+from users.models import User
 from tests.api.conftest import PASSWORD, signup
 
 pytestmark = pytest.mark.anyio
@@ -55,8 +57,35 @@ async def test_password_too_long_for_bcrypt_is_a_422_not_a_500(make_client):
 
 async def test_signup_rejects_a_taken_email(make_client):
     user = await signup(make_client())
-    again = await make_client().post("/auth/signup", json={"email": user["email"], "password": "x"})
+    again = await make_client().post("/auth/signup", json={"email": user["email"], "password": PASSWORD})
     assert again.status_code == 400
+
+
+async def test_email_case_does_not_matter(make_client):
+    client = make_client()
+    created = await client.post("/auth/signup", json={"email": "Mixed@Example.com", "password": PASSWORD})
+    assert created.status_code == 201
+    assert created.json()["email"] == "mixed@example.com"
+    await client.post("/auth/logout")
+
+    login = await client.post("/auth/login", json={"email": "MIXED@example.COM", "password": PASSWORD})
+    assert login.status_code == 200
+    again = await make_client().post("/auth/signup", json={"email": "mixed@EXAMPLE.com", "password": PASSWORD})
+    assert again.status_code == 400
+
+
+async def test_signup_password_shorter_than_8_characters_is_a_422(make_client):
+    response = await make_client().post(
+        "/auth/signup", json={"email": "short@example.com", "password": "a" * 7}
+    )
+    assert response.status_code == 422
+
+
+async def test_database_rejects_an_uppercase_email(db):
+    # The schemas lowercase emails; the constraint catches any other writer.
+    with pytest.raises(IntegrityError):
+        db.add(User(email="Upper@example.com", hashed_password="x"))
+        await db.flush()
 
 
 async def test_signup_can_be_closed(make_client, monkeypatch):
