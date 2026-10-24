@@ -22,6 +22,10 @@ os.environ.update({
         "TEST_DATABASE_URL",
         "postgresql+psycopg://app_user:dev_password@localhost:5432/language_app_test",
     ),
+    # Redis database 15, which tests/api/conftest.py flushes after every test.
+    # Set as a URL because the database number in a URL overrides a `db=`
+    # argument, so passing db=15 next to the dev URL would flush the dev data.
+    "REDIS_URL": os.environ.get("TEST_REDIS_URL", "redis://localhost:6379/15"),
 })
 
 from dictionary.en.mock import MockEnglishDictionaryProvider  # noqa: E402

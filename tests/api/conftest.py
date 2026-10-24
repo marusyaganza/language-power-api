@@ -7,7 +7,8 @@
 * Every test runs inside one outer transaction that is rolled back afterwards.
   The app's sessions join it through savepoints, so service code commits
   normally and nothing is left behind.
-* Redis: database 15, flushed after each test, so dev keys are never touched.
+* Redis: `settings.redis_url`, which tests/conftest.py points at database 15.
+  It is flushed after each test, so dev keys are never touched.
 """
 import uuid
 from collections.abc import AsyncIterator
@@ -30,7 +31,6 @@ from main import app
 from settings import settings
 
 ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
-TEST_REDIS_DB = 15
 PASSWORD = "correct-horse-battery"
 
 
@@ -86,12 +86,7 @@ async def db(_migrated_database) -> AsyncIterator[AsyncSession]:
 
 @pytest.fixture
 async def redis(monkeypatch):
-    client = aioredis.Redis(
-        host=settings.redis_host,
-        port=settings.redis_port,
-        db=TEST_REDIS_DB,
-        decode_responses=True,
-    )
+    client = aioredis.from_url(settings.redis_url, decode_responses=True)
     monkeypatch.setattr(auth.service, "redis_client", client)
     monkeypatch.setattr(games.session_store, "redis_client", client)
     try:

@@ -8,8 +8,4 @@ from redis import asyncio as aioredis
 
 from settings import settings
 
-redis_client = aioredis.Redis(
-    host=settings.redis_host,
-    port=settings.redis_port,
-    decode_responses=True,
-)
+redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
