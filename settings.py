@@ -17,7 +17,15 @@ class Settings(BaseSettings):
 
     session_cookie_name: str = "session_id"
     session_ttl_seconds: int = 60 * 60 * 24 * 30  # 30 days
-    cookie_secure: bool = False  
+    cookie_secure: bool = False  # True in production: the cookie only travels over HTTPS
+
+    # /docs, /redoc and /openapi.json. Off in production.
+    docs_enabled: bool = True
+    # Browser origins allowed to call the API from another site, as JSON in the
+    # environment: CORS_ORIGINS='["https://example.com"]'. Empty in production,
+    # where the frontend reaches the API through its own proxy (same origin),
+    # and then no CORS middleware is installed.
+    cors_origins: list[str] = ["http://localhost:5173"]
 
     model_config = SettingsConfigDict(env_file=".env")
 
