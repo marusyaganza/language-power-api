@@ -1,0 +1,32 @@
+# Secrets: configuration is passed as environment variables, never baked in.
+.env
+.env.*
+
+# Local environments and caches
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+
+# Not needed to run the API
+.git/
+.gitignore
+.vscode/
+.idea/
+notes/
+docs/
+tests/
+requirements-dev.txt
+pytest.ini
+.coveragerc
+create_mocks.py
+docker-compose.yml
+Dockerfile
+.dockerignore
+README.md
