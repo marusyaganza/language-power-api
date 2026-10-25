@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -26,6 +27,9 @@ class Settings(BaseSettings):
     # where the frontend reaches the API through its own proxy (same origin),
     # and then no CORS middleware is installed.
     cors_origins: list[str] = ["http://localhost:5173"]
+    # Secret shared with the Netlify proxy, which signs every request it
+    # forwards (core.proxy_signature). Unset: requests aren't checked.
+    proxy_signature_secret: SecretStr | None = None
 
     model_config = SettingsConfigDict(env_file=".env")
 

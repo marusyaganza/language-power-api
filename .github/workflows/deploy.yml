@@ -100,12 +100,11 @@ jobs:
             --labels "commit=${GITHUB_SHA::12}" \
             --quiet
 
-      # /auth/config needs no login. Switch to /health once it exists (Phase 6,
-      # item 7): with the signed proxy, /auth/config will reject calls that
-      # don't come through Netlify.
+      # /health is the one route that answers without the Netlify proxy's
+      # signature (every other route rejects direct calls once it's enforced).
       - name: Smoke test
         run: |
           URL=$(gcloud run services describe "$SERVICE_NAME" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format='value(status.url)')
-          curl --fail --silent --show-error --retry 3 --retry-delay 5 "$URL/auth/config"
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 "$URL/health"
           echo
           echo "### Deployed \`${GITHUB_SHA::12}\` to $TARGET" >> "$GITHUB_STEP_SUMMARY"
