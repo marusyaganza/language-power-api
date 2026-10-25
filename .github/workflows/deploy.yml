@@ -5,6 +5,8 @@
 # repository variables named <PREFIX>_..., e.g. PERSONAL_GCP_PROJECT_ID, and its
 # non-secret settings in deploy/<target>.env.yaml. Nothing here is secret: Google
 # trusts this workflow through Workload Identity Federation, not a stored key.
+# It trusts it by its name, "Deploy" (Workload Identity binding of the
+# deployer account); renaming it means updating that binding too.
 name: Deploy
 
 on:

@@ -1,0 +1,132 @@
+# Weekly backup of the personal deployment's database (Neon) to Cloud Storage.
+# Also runs by hand: Actions → Backup → Run workflow. One-time setup and how to
+# restore: notes/database-backups.md.
+#
+# Each dump is restored into a throwaway Postgres in the same run, and the run
+# fails if that doesn't work, so a broken backup is noticed the same week.
+#
+# Google trusts this workflow by its name, "Backup" (Workload Identity
+# binding); renaming it means updating that binding too.
+name: Backup
+
+on:
+  schedule:
+    - cron: "0 3 * * 0"  # Sundays 03:00 UTC; scheduled runs use the default branch
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write  # lets the job ask GitHub for the token Google exchanges
+
+    env:
+      GCP_PROJECT_ID: ${{ vars.PERSONAL_GCP_PROJECT_ID }}
+      GCP_WIF_PROVIDER: ${{ vars.PERSONAL_GCP_WIF_PROVIDER }}
+      GCP_BACKUP_SA: ${{ vars.PERSONAL_GCP_BACKUP_SA }}
+      BACKUP_BUCKET: ${{ vars.PERSONAL_BACKUP_BUCKET }}
+      # pg_dump must be at least the server's version (Neon runs 18). The
+      # runner's own client is older, so the official image is used instead.
+      PG_IMAGE: postgres:18-alpine
+      CHECK_DB_URL: postgresql://check:check@localhost:5433/restored
+
+    services:
+      # An empty Postgres of the same version, to prove the dump restores.
+      restore-check:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: check
+          POSTGRES_PASSWORD: check
+          POSTGRES_DB: restored
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U check"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check the variables are set
+        run: |
+          missing=""
+          for name in GCP_PROJECT_ID GCP_WIF_PROVIDER GCP_BACKUP_SA BACKUP_BUCKET; do
+            [ -n "${!name}" ] || missing="$missing PERSONAL_$name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository variables:$missing"
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WIF_PROVIDER }}
+          service_account: ${{ env.GCP_BACKUP_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      # The connection string is read from Secret Manager (the same secret Cloud
+      # Run uses) and masked, so it never appears in the log.
+      - name: Dump the database
+        run: |
+          DATABASE_URL=$(gcloud secrets versions access latest --secret DATABASE_URL --project "$GCP_PROJECT_ID")
+          echo "::add-mask::$DATABASE_URL"
+          # The app's URL names its Python driver; pg_dump wants plain postgresql://.
+          PG_URL="${DATABASE_URL/postgresql+psycopg:/postgresql:}"
+          echo "::add-mask::$PG_URL"
+
+          FILE="py-lp-$(date -u +%Y-%m-%dT%H%MZ).dump"
+          echo "FILE=$FILE" >> "$GITHUB_ENV"
+
+          # Custom format: compressed, and pg_restore can restore all of it or
+          # single tables. No owners or grants: they name Neon's own roles.
+          docker run --rm --network host -v "$PWD:/work" -e PG_URL="$PG_URL" "$PG_IMAGE" \
+            sh -c 'pg_dump --format=custom --no-owner --no-privileges --file "/work/$0" "$PG_URL"' "$FILE"
+          ls -l "$FILE"
+
+      - name: Check the dump restores
+        run: |
+          docker run --rm --network host -v "$PWD:/work" "$PG_IMAGE" \
+            pg_restore --exit-on-error --no-owner --no-privileges --dbname "$CHECK_DB_URL" "/work/$FILE"
+
+          read -r USERS WORDS MIGRATION < <(
+            docker run --rm --network host "$PG_IMAGE" psql "$CHECK_DB_URL" \
+              --tuples-only --no-align --field-separator ' ' \
+              --command "select (select count(*) from users), (select count(*) from words), (select version_num from alembic_version)"
+          )
+          echo "Restored: users=$USERS words=$WORDS migration=$MIGRATION"
+          if [ "${USERS:-0}" -lt 1 ]; then
+            echo "::error::The restored dump has no users; something is wrong with the backup"
+            exit 1
+          fi
+          echo "RESTORED=$USERS users, $WORDS words, migration $MIGRATION" >> "$GITHUB_ENV"
+
+      # Uploaded with the plain JSON API rather than `gcloud storage cp`, because
+      # the backup account may only create objects, not read or list them.
+      # ifGenerationMatch=0: never overwrite an existing backup.
+      - name: Upload to Cloud Storage
+        run: |
+          TOKEN=$(gcloud auth print-access-token)
+          echo "::add-mask::$TOKEN"
+          curl --fail --silent --show-error --output /dev/null \
+            --request POST \
+            --header "Authorization: Bearer $TOKEN" \
+            --header "Content-Type: application/octet-stream" \
+            --data-binary "@$FILE" \
+            "https://storage.googleapis.com/upload/storage/v1/b/$BACKUP_BUCKET/o?uploadType=media&ifGenerationMatch=0&name=weekly%2F$FILE"
+
+          SIZE=$(du -h "$FILE" | cut -f1)
+          {
+            echo "### Backup \`weekly/$FILE\` ($SIZE)"
+            echo "$RESTORED"
+          } >> "$GITHUB_STEP_SUMMARY"
