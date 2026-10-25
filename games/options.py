@@ -8,12 +8,23 @@ answer.
 Texts are compared ignoring case and spacing.
 """
 import random
+from typing import Protocol
 
 from games.hints import hidden_definitions
-from words.models import Word
 
 
-def definition_options(target: Word, pool: list[Word], count: int) -> tuple[str, list[str]]:
+class OptionWord(Protocol):
+    """What option picking reads from a word: a saved `Word` or a `WordSummary`."""
+
+    id: int
+    name: str
+    stems: list[str]
+    defs: list[str]
+
+
+def definition_options(
+    target: OptionWord, pool: list[OptionWord], count: int
+) -> tuple[str, list[str]]:
     """select_def: return the answer (the target's first definition) and the shuffled options.
 
     Every definition is shown with its own word hidden, so blanks do not
@@ -46,7 +57,7 @@ def definition_options(target: Word, pool: list[Word], count: int) -> tuple[str,
     return answer, options
 
 
-def word_options(target: Word, pool: list[Word], count: int) -> list[str]:
+def word_options(target: OptionWord, pool: list[OptionWord], count: int) -> list[str]:
     """select_word: return the shuffled options, one of which is the target's name.
 
     A word is skipped if its name is already an option (e.g. "ser" the verb
@@ -69,7 +80,7 @@ def word_options(target: Word, pool: list[Word], count: int) -> list[str]:
     return options
 
 
-def _others(target: Word, pool: list[Word]) -> list[Word]:
+def _others(target: OptionWord, pool: list[OptionWord]) -> list[OptionWord]:
     others = [w for w in pool if w.id != target.id]
     random.shuffle(others)
     return others

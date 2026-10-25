@@ -74,7 +74,7 @@ from games.spaced_repetition import (
     update_progress,
 )
 from words.models import Word
-from words.service import get_word_ids, get_words_by_ids
+from words.service import WordSummary, get_word_ids, get_word_summaries, get_words_by_ids
 
 logger = logging.getLogger(__name__)
 
@@ -277,7 +277,7 @@ def _image_question(word: Word) -> QuestionOut:
     )
 
 
-def _select_def_question(word: Word, pool: list[Word], option_count: int) -> tuple[QuestionOut, str]:
+def _select_def_question(word: Word, pool: list[WordSummary], option_count: int) -> tuple[QuestionOut, str]:
     """select_def: pick the definition of the word."""
     answer, options = definition_options(word, pool, option_count)
     return QuestionOut(
@@ -292,7 +292,7 @@ def _select_def_question(word: Word, pool: list[Word], option_count: int) -> tup
     ), answer
 
 
-def _select_word_question(word: Word, pool: list[Word], option_count: int) -> tuple[QuestionOut, str]:
+def _select_word_question(word: Word, pool: list[WordSummary], option_count: int) -> tuple[QuestionOut, str]:
     """select_word: pick the word that the definitions describe."""
     return QuestionOut(
         id=word.id,
@@ -306,7 +306,7 @@ def _select_word_question(word: Word, pool: list[Word], option_count: int) -> tu
     ), word.name
 
 
-def _gender_question(word: Word, pool: list[Word], option_count: int) -> tuple[QuestionOut, str]:
+def _gender_question(word: Word, pool: list[WordSummary], option_count: int) -> tuple[QuestionOut, str]:
     """gender: tick the noun's gender(s). The answer is "masculine",
     "feminine" or "both"."""
     return QuestionOut(
@@ -327,8 +327,8 @@ def _meaning(word: Word) -> str:
 
 
 # Turns a word into a question and the answer the session store expects back.
-# `pool` is every word the game can use (empty unless `options_from_pool`).
-_BuildQuestion = Callable[[Word, list[Word], int], tuple[QuestionOut, str]]
+# `pool` summarizes every word the game can use (empty unless `options_from_pool`).
+_BuildQuestion = Callable[[Word, list[WordSummary], int], tuple[QuestionOut, str]]
 
 
 def _typed(build: Callable[[Word], QuestionOut]) -> _BuildQuestion:
@@ -385,14 +385,15 @@ async def _start_session(
         schedules, mode, new_words_first, datetime.now(UTC), words_per_session
     )
 
-    if spec.options_from_pool:
-        # The options come from all the words the game can use.
-        pool = await get_words_by_ids(db, user_id, [s.word_id for s in schedules])
-        by_id = {w.id: w for w in pool}
-        words = [by_id[i] for i in word_ids if i in by_id]
-    else:
-        pool = []
-        words = await get_words_by_ids(db, user_id, word_ids)
+    # Options are compared against every word the game can use, so that no
+    # second correct answer slips in, but only through summaries: the full
+    # words (with examples) are loaded just for the session's questions.
+    pool = (
+        await get_word_summaries(db, user_id, [s.word_id for s in schedules])
+        if spec.options_from_pool
+        else []
+    )
+    words = await get_words_by_ids(db, user_id, word_ids)
     random.shuffle(words)
 
     built = [spec.build(w, pool, _option_count(game)) for w in words]

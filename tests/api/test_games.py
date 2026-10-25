@@ -189,6 +189,26 @@ async def test_select_def_options_contain_the_answer(client, games):
         assert response["grade"] == "correct"
 
 
+async def test_select_def_options_consider_the_whole_pool(client, games):
+    # "ente" means "being", which is also a meaning of "ser" the noun. In the
+    # question for "ser" the verb, the player only sees "ser", so "being" would
+    # be a second correct option. Excluding it needs both "ser" entries from
+    # the pool, which is loaded as summaries (words.service.get_word_summaries).
+    ser_verb = await save_word(
+        client, "ser", uuid="ser-verb", defs=["to be"], examples=[{"text": "quiero ser feliz"}]
+    )
+    await save_word(client, "ser", uuid="ser-noun", defs=["being"])
+    await save_word(client, "ente", defs=["being"])
+    for name, meaning in [("perro", "dog"), ("gato", "cat"), ("casa", "house")]:
+        await save_word(client, name, defs=[meaning])
+
+    _gid, session = await start(client, "select_def")
+    [question] = [q for q in session["questions"] if q["id"] == ser_verb["id"]]
+    assert sorted(question["options"]) == ["cat", "dog", "house", "to be"]
+    # The session's own words are still loaded in full.
+    assert question["additional_info"]["examples"][0]["text"] == "quiero ser feliz"
+
+
 # --------------------------------------------------------------------------- #
 # Spaced repetition across sessions
 # --------------------------------------------------------------------------- #

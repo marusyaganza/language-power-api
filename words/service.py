@@ -19,6 +19,7 @@ Rules that apply to every function below:
   has (audio, image, gender), and callers decide which of those they need.
 """
 import logging
+from dataclasses import dataclass
 from math import ceil
 
 from sqlalchemy import Select, select
@@ -56,6 +57,8 @@ __all__ = [
     "get_vocabulary_page",
     "get_word_ids",
     "get_words_by_ids",
+    "WordSummary",
+    "get_word_summaries",
 ]
 
 VOCABULARY_PAGE_SIZE = 10
@@ -289,6 +292,34 @@ async def get_word_ids(
     )
     result = await db.scalars(query)
     return list(result.all())
+
+
+@dataclass(frozen=True)
+class WordSummary:
+    """The fields of a saved word needed to compare it with others, nothing more."""
+
+    id: int
+    name: str
+    stems: list[str]
+    defs: list[str]
+
+
+async def get_word_summaries(
+    db: AsyncSession, user_id: int, word_ids: list[int]
+) -> list[WordSummary]:
+    """Summaries of the user's saved words with these ids, in no particular order.
+
+    Much lighter than `get_words_by_ids`: four columns and no examples, for
+    when many words are compared and few are shown. Ids that do not exist or
+    belong to another user are skipped.
+    """
+    if not word_ids:
+        return []
+    rows = await db.execute(
+        select(Word.id, Word.name, Word.stems, Word.defs)
+        .where(Word.user_id == user_id, Word.id.in_(word_ids))
+    )
+    return [WordSummary(*row) for row in rows]
 
 
 async def get_words_by_ids(db: AsyncSession, user_id: int, word_ids: list[int]) -> list[Word]:
