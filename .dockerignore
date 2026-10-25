@@ -17,6 +17,8 @@ htmlcov/
 # Not needed to run the API
 .git/
 .gitignore
+.github/
+deploy/
 .vscode/
 .idea/
 notes/
