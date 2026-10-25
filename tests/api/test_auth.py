@@ -3,6 +3,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from settings import settings
+from auth.schemas import UserCreate
+from users import service as users_service
 from users.models import User
 from tests.api.conftest import PASSWORD, signup
 
@@ -102,3 +104,37 @@ async def test_requests_without_a_valid_session_are_rejected(make_client):
     assert (await client.get("/words/vocabulary", params={"language": "es"})).status_code == 403
     client.cookies.set(settings.session_cookie_name, "made-up-session-id")
     assert (await client.get("/auth/me")).status_code == 403
+
+
+async def test_signup_race_for_one_email_is_a_400_not_a_500(make_client, monkeypatch):
+    # Two simultaneous signups can both pass the "is this email taken?" check.
+    # Simulate the second one by making that check miss.
+    first = make_client()
+    user = await signup(first)
+
+    async def nobody_has_it(db, email):
+        return None
+
+    monkeypatch.setattr(users_service, "get_user_by_email", nobody_has_it)
+    second = await make_client().post(
+        "/auth/signup", json={"email": user["email"], "password": PASSWORD}
+    )
+    assert second.status_code == 400
+    assert second.json() == {"detail": "Email already registered"}
+    assert (await first.get("/auth/me")).json()["id"] == user["id"]
+
+
+async def test_create_user_reports_a_taken_email(db):
+    await users_service.create_user(db, UserCreate(email="dup@example.com", password=PASSWORD))
+    with pytest.raises(users_service.EmailTakenError):
+        await users_service.create_user(db, UserCreate(email="dup@example.com", password=PASSWORD))
+
+
+async def test_create_user_keeps_other_database_errors(db):
+    # Only a duplicate email is translated; anything else must still surface.
+    # model_construct skips validation, so the uppercase email reaches the
+    # database and breaks ck_users_email_lowercase instead.
+    with pytest.raises(IntegrityError):
+        await users_service.create_user(
+            db, UserCreate.model_construct(email="Upper@example.com", password=PASSWORD)
+        )

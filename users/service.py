@@ -10,19 +10,29 @@ does) so they do not block the event loop.
 import asyncio
 
 import bcrypt
+from psycopg.errors import UniqueViolation
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.schemas import UserCreate
 from users.models import User
 
+# The unique index on users.email (models: `email = Column(..., unique=True, index=True)`).
+EMAIL_UNIQUE_INDEX = "ix_users_email"
+
 __all__ = [
+    "EmailTakenError",
     "hash_password",
     "verify_password",
     "create_user",
     "get_user_by_id",
     "get_user_by_email",
 ]
+
+
+class EmailTakenError(Exception):
+    """Another account already has this email."""
 
 
 def hash_password(password: str) -> str:
@@ -42,8 +52,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 async def create_user(db: AsyncSession, user_in: UserCreate) -> User:
     """Store a new user with the password hashed, and return it.
 
-    Does not check that the email is unused. If the email column is unique,
-    a duplicate surfaces as a database `IntegrityError`.
+    The database's unique index is what guarantees one account per email:
+    a check before calling this can't, since two requests can both pass it
+    before either inserts.
+
+    Raises:
+        EmailTakenError: the email is already registered. Nothing is stored
+            and the session is rolled back. Any other database error is
+            raised unchanged.
     """
     user = User(
         email=user_in.email,
@@ -52,7 +68,16 @@ async def create_user(db: AsyncSession, user_in: UserCreate) -> User:
         hashed_password=await asyncio.to_thread(hash_password, user_in.password),
     )
     db.add(user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        if (
+            isinstance(exc.orig, UniqueViolation)
+            and exc.orig.diag.constraint_name == EMAIL_UNIQUE_INDEX
+        ):
+            raise EmailTakenError(user_in.email) from exc
+        raise
     await db.refresh(user)
     return user
 

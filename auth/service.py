@@ -90,10 +90,9 @@ def mocks_enabled() -> bool:
 async def signup(db: AsyncSession, user_in: UserCreate) -> AuthResult:
     """Create an account and start a session for it.
 
-    The email check and the insert are not atomic. Two simultaneous signups
-    with the same email can both pass the check, and the loser is then
-    rejected by the database (if the email column is unique) as a database
-    error rather than `EmailAlreadyRegisteredError`.
+    The email check below is only the fast path: two simultaneous signups
+    with the same email can both pass it. The database's unique index then
+    rejects the second insert, and that is reported the same way.
 
     Raises:
         SignupClosedError: signups are turned off.
@@ -105,7 +104,10 @@ async def signup(db: AsyncSession, user_in: UserCreate) -> AuthResult:
     if await users_service.get_user_by_email(db, user_in.email) is not None:
         raise EmailAlreadyRegisteredError("Email already registered")
 
-    user = await users_service.create_user(db, user_in)
+    try:
+        user = await users_service.create_user(db, user_in)
+    except users_service.EmailTakenError as exc:
+        raise EmailAlreadyRegisteredError("Email already registered") from exc
     return AuthResult(user=user, session_id=await create_session(user.id))
 
 
