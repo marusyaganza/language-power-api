@@ -21,9 +21,9 @@ from games import service
 from games.schemas import (
     AnswerRequest,
     AnswerResponse,
-    GameMode,
     GameOut,
     GameResultOut,
+    GameSessionCreate,
     GameSessionOut,
     GameSettingsOut,
     GameSettingsPreset,
@@ -38,7 +38,6 @@ _STATUS_FOR_ERROR: dict[type[service.GamesError], int] = {
     service.GameNotFoundError: status.HTTP_404_NOT_FOUND,
     service.GameNotImplementedError: status.HTTP_501_NOT_IMPLEMENTED,
     service.SessionNotFoundError: status.HTTP_404_NOT_FOUND,
-    service.SessionGameMismatchError: status.HTTP_400_BAD_REQUEST,
     service.QuestionNotFoundError: status.HTTP_404_NOT_FOUND,
     service.SessionFinishedError: status.HTTP_409_CONFLICT,
     service.QuestionAlreadyAnsweredError: status.HTTP_409_CONFLICT,
@@ -72,12 +71,14 @@ async def list_games(
     return await service.list_games_for_language(db, user.id, language)
 
 
-@router.get("/{game_id}", response_model=GameSessionOut)
+@router.post(
+    "/{game_id}/sessions",
+    response_model=GameSessionOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def start_game_session(
     game_id: int,
-    language: str = Query(...),
-    mode: GameMode = Query(GameMode.SPACED),
-    new_words_first: bool = Query(False),
+    payload: GameSessionCreate,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -91,13 +92,15 @@ async def start_game_session(
     """
     with _http_errors():
         return await service.start_game_session(
-            db, user.id, game_id, language, mode, new_words_first
+            db, user.id, game_id, payload.language, payload.mode, payload.new_words_first
         )
 
 
-@router.post("/{game_id}/answer", response_model=AnswerResponse)
+# Session path parameters are not called `session_id`: `get_current_user`
+# already reads the auth cookie under that name, and FastAPI cannot take both.
+@router.post("/sessions/{game_session_id}/answers", response_model=AnswerResponse)
 async def submit_answer(
-    game_id: int,
+    game_session_id: str,
     payload: AnswerRequest,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -105,16 +108,15 @@ async def submit_answer(
     """Grade an answer in a running game session.
 
     404 if the session expired, belongs to another user, or has no such
-    question, 400 if the session belongs to another game, 409 if the session
-    is finished or the question was already answered. The learning progress
-    is saved before the response is sent; a failure to save it is logged, not
-    reported, since the answer has already been graded.
+    question, 409 if the session is finished or the question was already
+    answered. The learning progress is saved before the response is sent; a
+    failure to save it is logged, not reported, since the answer has already
+    been graded.
     """
     with _http_errors():
         check = await service.check_answer(
             user_id=user.id,
-            session_id=payload.session_id,
-            game_id=game_id,
+            session_id=game_session_id,
             word_id=payload.word_id,
             answer=payload.answer,
         )
@@ -133,13 +135,12 @@ async def submit_answer(
     )
 
 
-# The path parameter is not called `session_id`: `get_current_user` already
-# reads the auth cookie under that name, and FastAPI cannot take both.
-@router.get("/result/{game_session_id}", response_model=GameResultOut)
+@router.post("/sessions/{game_session_id}/result", response_model=GameResultOut)
 async def get_game_result(game_session_id: str, user=Depends(get_current_user)):
     """Finish a game session (if still running) and return its result.
 
-    404 if the session expired or belongs to another user.
+    Idempotent: calling it again on a finished session returns the same
+    result. 404 if the session expired or belongs to another user.
     """
     with _http_errors():
         return await service.get_session_result(user.id, game_session_id)

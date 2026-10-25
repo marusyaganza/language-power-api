@@ -1,10 +1,12 @@
 """Short-lived game sessions, kept in Redis.
 
 A game session is the set of questions for one play-through, with the
-expected answers, so the answers never have to be sent to the client. It
-expires `GAME_SESSION_TTL_SECONDS` after it is created, and answering does not
-extend that. Sessions are looked up by id; the stored `user_id` lets callers
-check that the session belongs to whoever is answering.
+expected answers, so the answers never have to be sent to the client. A
+running session expires `GAME_SESSION_TTL_SECONDS` after its last activity
+(being created or answered); Redis then deletes it, so an expired session
+looks exactly like one that never existed. Sessions are looked up by id; the
+stored `user_id` lets callers check that the session belongs to whoever is
+answering.
 
 A session is finished once every question is answered, or earlier when the
 player asks for the result (`finish_game_session`). A finished session is kept
@@ -90,7 +92,7 @@ async def mark_question_answered(
 
     `session_data` is updated in place and saved back to Redis. Answering the
     last question finishes the session (see `finish_game_session`); otherwise
-    the session's remaining lifetime is kept, not reset.
+    the session's lifetime starts again from now.
     """
     for question in session_data["questions"]:
         if question["word_id"] == word_id:
@@ -102,7 +104,9 @@ async def mark_question_answered(
         await finish_game_session(session_id, session_data)
     else:
         await redis_client.set(
-            _game_session_key(session_id), json.dumps(session_data), keepttl=True
+            _game_session_key(session_id),
+            json.dumps(session_data),
+            ex=GAME_SESSION_TTL_SECONDS,
         )
     return complete
 

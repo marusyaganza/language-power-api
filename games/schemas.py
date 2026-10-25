@@ -42,6 +42,12 @@ class QuestionOut(BaseModel):
     alt: str | None = None  # image game only: a text clue if the image fails to load
     additional_info: QuestionAdditionalInfo
 
+class GameSessionCreate(BaseModel):
+    language: str
+    mode: GameMode = GameMode.SPACED
+    new_words_first: bool = False  # words never practiced in this game first
+
+
 class GameSessionOut(BaseModel):
     task: str
     session_id: str
@@ -49,7 +55,6 @@ class GameSessionOut(BaseModel):
 
 
 class AnswerRequest(BaseModel):
-    session_id: str
     word_id: int
     answer: str
 

@@ -4,6 +4,7 @@ from sqlalchemy import select
 
 from games.models import ReviewLog, WordProgress
 from games.seed import sync_games
+from games.session_store import GAME_SESSION_TTL_SECONDS, _game_session_key
 from tests.api.conftest import save_word, signup
 
 pytestmark = pytest.mark.anyio
@@ -20,17 +21,21 @@ async def game_id(client, game_type, language="es"):
     return next(g["id"] for g in listed if g["game_type"] == game_type)
 
 
-async def start(client, game_type, **params):
+async def start(client, game_type, **body):
     gid = await game_id(client, game_type)
-    response = await client.get(f"/games/{gid}", params={"language": "es", **params})
-    assert response.status_code == 200, response.text
+    response = await client.post(f"/games/{gid}/sessions", json={"language": "es", **body})
+    assert response.status_code == 201, response.text
     return gid, response.json()
 
 
-async def answer(client, gid, session, word_id, text):
-    return await client.post(f"/games/{gid}/answer", json={
-        "session_id": session["session_id"], "word_id": word_id, "answer": text,
+async def answer(client, session, word_id, text):
+    return await client.post(f"/games/sessions/{session['session_id']}/answers", json={
+        "word_id": word_id, "answer": text,
     })
+
+
+async def result(client, session):
+    return await client.post(f"/games/sessions/{session['session_id']}/result")
 
 
 # --------------------------------------------------------------------------- #
@@ -55,14 +60,25 @@ async def test_list_counts_the_words_each_game_can_use(client, games):
 
 
 async def test_unknown_game(client, games):
-    assert (await client.get("/games/999999", params={"language": "es"})).status_code == 404
+    assert (await client.post("/games/999999/sessions", json={"language": "es"})).status_code == 404
+
+
+async def test_start_needs_a_language(client, games):
+    gid = await game_id(client, "type_word")
+    assert (await client.post(f"/games/{gid}/sessions", json={})).status_code == 422
+
+
+async def test_old_game_session_routes_are_gone(client, games):
+    gid, session = await start(client, "type_word")
+    assert (await client.get(f"/games/{gid}", params={"language": "es"})).status_code in (404, 405)
+    assert (await client.get(f"/games/result/{session['session_id']}")).status_code in (404, 405)
 
 
 async def test_multiple_choice_game_needs_enough_words_for_the_options(client, games):
     for name in ["uno", "dos", "tres"]:
         await save_word(client, name)
     gid = await game_id(client, "select_def")
-    response = await client.get(f"/games/{gid}", params={"language": "es"})
+    response = await client.post(f"/games/{gid}/sessions", json={"language": "es"})
     assert response.status_code == 409
 
 
@@ -80,9 +96,9 @@ async def test_type_word_question_hides_the_word_in_its_clues(client, games):
 
 async def test_answer_is_graded_and_progress_saved(client, db, games):
     word = await save_word(client, "casa")
-    gid, session = await start(client, "type_word")
+    _gid, session = await start(client, "type_word")
 
-    response = await answer(client, gid, session, word["id"], "Casa")
+    response = await answer(client, session, word["id"], "Casa")
     assert response.status_code == 200, response.text
     assert response.json() == {"grade": "correct", "correct_answer": None, "session_complete": True}
 
@@ -97,8 +113,8 @@ async def test_answer_is_graded_and_progress_saved(client, db, games):
 
 async def test_wrong_answer_reveals_the_expected_one(client, games):
     word = await save_word(client, "casa")
-    gid, session = await start(client, "type_word")
-    response = (await answer(client, gid, session, word["id"], "perro")).json()
+    _gid, session = await start(client, "type_word")
+    response = (await answer(client, session, word["id"], "perro")).json()
     assert response["grade"] == "wrong"
     assert response["correct_answer"] == "casa"
 
@@ -106,42 +122,54 @@ async def test_wrong_answer_reveals_the_expected_one(client, games):
 async def test_a_question_can_be_answered_only_once(client, games):
     await save_word(client, "casa")
     await save_word(client, "perro")
-    gid, session = await start(client, "type_word")
+    _gid, session = await start(client, "type_word")
     first = session["questions"][0]["id"]
 
-    assert (await answer(client, gid, session, first, "x")).json()["session_complete"] is False
-    assert (await answer(client, gid, session, first, "casa")).status_code == 409
+    assert (await answer(client, session, first, "x")).json()["session_complete"] is False
+    assert (await answer(client, session, first, "casa")).status_code == 409
 
 
 async def test_answer_for_a_word_not_in_the_session(client, games):
     await save_word(client, "casa")
-    gid, session = await start(client, "type_word")
-    assert (await answer(client, gid, session, 999999, "casa")).status_code == 404
-
-
-async def test_answer_to_the_wrong_game(client, games):
-    word = await save_word(client, "casa", gender="feminine")
     _gid, session = await start(client, "type_word")
-    gender_game = await game_id(client, "gender")
-    assert (await answer(client, gender_game, session, word["id"], "feminine")).status_code == 400
+    assert (await answer(client, session, 999999, "casa")).status_code == 404
+
+
+async def test_answering_restarts_the_session_lifetime(client, redis, games):
+    await save_word(client, "casa")
+    await save_word(client, "perro")
+    _gid, session = await start(client, "type_word")
+    key = _game_session_key(session["session_id"])
+    await redis.expire(key, 60)  # as if the session had been idle for 19 minutes
+
+    await answer(client, session, session["questions"][0]["id"], "x")
+    assert await redis.ttl(key) > GAME_SESSION_TTL_SECONDS - 10
+
+
+async def test_an_expired_session_is_not_found(client, redis, games):
+    word = await save_word(client, "casa")
+    _gid, session = await start(client, "type_word")
+    await redis.delete(_game_session_key(session["session_id"]))  # what expiry does
+    assert (await answer(client, session, word["id"], "casa")).status_code == 404
+    assert (await result(client, session)).status_code == 404
 
 
 async def test_other_user_cannot_use_a_session(client, make_client, games):
     word = await save_word(client, "casa")
-    gid, session = await start(client, "type_word")
+    _gid, session = await start(client, "type_word")
 
     other = make_client()
     await signup(other)
-    assert (await answer(other, gid, session, word["id"], "casa")).status_code == 404
-    assert (await other.get(f"/games/result/{session['session_id']}")).status_code == 404
+    assert (await answer(other, session, word["id"], "casa")).status_code == 404
+    assert (await result(other, session)).status_code == 404
 
 
 async def test_gender_game_gives_partial_credit(client, games):
     word = await save_word(client, "ecologista", gender="both")
-    gid, session = await start(client, "gender")
+    _gid, session = await start(client, "gender")
     assert session["questions"][0]["options"] == ["masculine", "feminine"]
 
-    response = (await answer(client, gid, session, word["id"], "masculine")).json()
+    response = (await answer(client, session, word["id"], "masculine")).json()
     assert response["grade"] == "close"
     assert response["correct_answer"] == "both"
 
@@ -150,14 +178,14 @@ async def test_select_def_options_contain_the_answer(client, games):
     words = {}
     for name, meaning in [("perro", "dog"), ("gato", "cat"), ("casa", "house"), ("mesa", "table")]:
         words[name] = await save_word(client, name, defs=[meaning])
-    gid, session = await start(client, "select_def")
+    _gid, session = await start(client, "select_def")
     assert len(session["questions"]) == 4
 
     meaning_of = {w["id"]: w["defs"][0] for w in words.values()}
     for question in session["questions"]:
         assert len(question["options"]) == 4
         assert meaning_of[question["id"]] in question["options"]
-        response = (await answer(client, gid, session, question["id"], meaning_of[question["id"]])).json()
+        response = (await answer(client, session, question["id"], meaning_of[question["id"]])).json()
         assert response["grade"] == "correct"
 
 
@@ -168,7 +196,7 @@ async def test_select_def_options_contain_the_answer(client, games):
 async def test_a_learned_word_waits_until_it_is_due(client, games):
     word = await save_word(client, "casa")
     gid, session = await start(client, "type_word")
-    await answer(client, gid, session, word["id"], "casa")
+    await answer(client, session, word["id"], "casa")
 
     # A correct first answer schedules the next review a day later.
     listed = next(g for g in (await client.get("/games", params={"language": "es"})).json() if g["id"] == gid)
@@ -183,13 +211,13 @@ async def test_a_learned_word_waits_until_it_is_due(client, games):
 
 async def test_extra_practice_does_not_move_the_schedule(client, db, games):
     word = await save_word(client, "casa")
-    gid, session = await start(client, "type_word")
-    await answer(client, gid, session, word["id"], "casa")
+    _gid, session = await start(client, "type_word")
+    await answer(client, session, word["id"], "casa")
     progress = await db.scalar(select(WordProgress).where(WordProgress.word_id == word["id"]))
     scheduled = progress.next_review_date
 
     _gid, review = await start(client, "type_word", mode="review")
-    await answer(client, gid, review, word["id"], "casa")
+    await answer(client, review, word["id"], "casa")
 
     await db.refresh(progress)
     assert progress.next_review_date == scheduled
@@ -204,26 +232,28 @@ async def test_extra_practice_does_not_move_the_schedule(client, db, games):
 async def test_result_finishes_the_session_and_counts_unanswered(client, games):
     for name in ["uno", "dos", "tres"]:
         await save_word(client, name)
-    gid, session = await start(client, "type_word")
+    _gid, session = await start(client, "type_word")
     questions = session["questions"]
     vocabulary = (await client.get("/words/vocabulary", params={"language": "es"})).json()
     name_of = {w["id"]: w["name"] for w in vocabulary["items"]}
 
     # One right, one wrong, one left unanswered.
-    await answer(client, gid, session, questions[0]["id"], name_of[questions[0]["id"]])
-    await answer(client, gid, session, questions[1]["id"], "nope")
+    await answer(client, session, questions[0]["id"], name_of[questions[0]["id"]])
+    await answer(client, session, questions[1]["id"], "nope")
 
-    result = await client.get(f"/games/result/{session['session_id']}")
-    assert result.status_code == 200, result.text
-    body = result.json()
+    response = await result(client, session)
+    assert response.status_code == 200, response.text
+    body = response.json()
     assert (body["total_words"], body["correct"], body["wrong"], body["unanswered"]) == (3, 1, 1, 1)
     assert body["score_percent"] == 33
 
     # Finished: the last question takes no more answers.
-    assert (await answer(client, gid, session, questions[2]["id"], "x")).status_code == 409
-    # Reading the result again gives the same answer.
-    assert (await client.get(f"/games/result/{session['session_id']}")).json() == body
+    assert (await answer(client, session, questions[2]["id"], "x")).status_code == 409
+    # Asking for the result again is not an error and gives the same result.
+    again = await result(client, session)
+    assert again.status_code == 200
+    assert again.json() == body
 
 
 async def test_result_of_an_unknown_session(client, games):
-    assert (await client.get("/games/result/not-a-session")).status_code == 404
+    assert (await result(client, {"session_id": "not-a-session"})).status_code == 404

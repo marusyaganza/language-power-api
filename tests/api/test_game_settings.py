@@ -50,9 +50,9 @@ async def test_settings_change_the_schedule(client, db):
     word = await save_word(client, "casa")
     games = (await client.get("/games", params={"language": "es"})).json()
     gid = next(g["id"] for g in games if g["game_type"] == "type_word")
-    session = (await client.get(f"/games/{gid}", params={"language": "es"})).json()
-    await client.post(f"/games/{gid}/answer", json={
-        "session_id": session["session_id"], "word_id": word["id"], "answer": "casa",
+    session = (await client.post(f"/games/{gid}/sessions", json={"language": "es"})).json()
+    await client.post(f"/games/sessions/{session['session_id']}/answers", json={
+        "word_id": word["id"], "answer": "casa",
     })
 
     progress = await db.scalar(select(WordProgress).where(WordProgress.word_id == word["id"]))

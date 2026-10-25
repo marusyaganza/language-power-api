@@ -31,9 +31,12 @@ words, the session has fewer questions.
 ## The flow of a game
 
 1. **List the games** for a language: `GET /games?language=es`
-2. **Start a session**: `GET /games/{game_id}?language=es&mode=spaced`
-3. **Answer each question**: `POST /games/{game_id}/answer` (once per question)
-4. **Show the result**: `GET /games/result/{session_id}`
+2. **Start a session**: `POST /games/{game_id}/sessions`
+3. **Answer each question**: `POST /games/sessions/{session_id}/answers` (once per question)
+4. **Show the result**: `POST /games/sessions/{session_id}/result`
+
+Starting and finishing change state, so every step after the list is a
+`POST`.
 
 The player can stop at any time. Requesting the result ends the session
 early (see [Finishing early](#finishing-early)).
@@ -79,15 +82,21 @@ returned, so the client can switch modes without another request:
 
 ---
 
-## 2. Start a session: `GET /games/{game_id}`
+## 2. Start a session: `POST /games/{game_id}/sessions`
 
-| Query parameter | Values | Default | Meaning |
+Each call creates a new session.
+
+```json
+{ "language": "es", "mode": "spaced", "new_words_first": false }
+```
+
+| Field | Values | Default | Meaning |
 |---|---|---|---|
 | `language` | `en`, `es` | required | Which saved words to use |
 | `mode` | `spaced`, `review` | `spaced` | See [Modes](#modes) |
 | `new_words_first` | `true`, `false` | `false` | Put words never practiced in this game before the others |
 
-Response:
+Response (201):
 
 ```json
 {
@@ -112,6 +121,7 @@ Response:
 
 - `task` is the instruction to show as the game's heading, with the
   question below it. Never join the two.
+- `session_id` identifies the session in the answer and result URLs.
 - `id` of a question is the word's id. Send it back as `word_id` when
   answering.
 - `question` is a **list of strings** (definitions) or a **single string**
@@ -170,10 +180,10 @@ For example, "the **heart** thought of as…" becomes "the ___ thought of as…"
 
 ---
 
-## 3. Answer a question: `POST /games/{game_id}/answer`
+## 3. Answer a question: `POST /games/sessions/{session_id}/answers`
 
 ```json
-{ "session_id": "2f56b64e-...", "word_id": 67, "answer": "heart" }
+{ "word_id": 67, "answer": "heart" }
 ```
 
 What to send as `answer`:
@@ -208,7 +218,9 @@ Response:
 
 ---
 
-## 4. Result: `GET /games/result/{session_id}`
+## 4. Result: `POST /games/sessions/{session_id}/result`
+
+Ends the session if it's still running and returns its result. No body.
 
 ```json
 {
@@ -241,7 +253,8 @@ unanswered. After that:
 - no more answers are accepted (409);
 - unanswered words are reported as `"unanswered"` and **do not affect the
   word's practice schedule**;
-- the result can be requested again and stays the same.
+- the result can be requested again: the same call returns the same result,
+  with no error.
 
 ---
 
@@ -362,11 +375,14 @@ Suggested note for the settings screen:
 
 ## Session lifetime
 
-- A session lasts **20 minutes** from the moment it starts. Answering doesn't
-  extend it.
+- A running session expires **20 minutes after its last activity**: when it
+  was started, or its last answer. Each answer gives it another 20 minutes.
 - Once a session is finished (every question answered, or the result
   requested), it is kept for **1 hour** so the result can still be read.
-- An expired session returns 404.
+- **An expired session is deleted.** Answering it or asking for its result
+  returns 404, the same as for a session that never existed. Every answer
+  was already saved as learning progress, but the session's result is gone.
+  Tell the player the game timed out and offer a new one.
 - **A session can only be used by the user who started it.** Anyone else gets
   404, as if it didn't exist.
 
@@ -377,9 +393,8 @@ Suggested note for the settings screen:
 | Status | When |
 |---|---|
 | 404 | Game doesn't exist. Session expired, never existed, or belongs to another user. The word isn't part of the session. |
-| 400 | The session was started for a different game than the one in the answer URL. |
 | 409 | Question already answered. Session already finished. Starting `select_word`/`select_def` with fewer words than `min_word_count`. |
-| 422 | Invalid request values, e.g. game settings out of range. |
+| 422 | Invalid request values, e.g. a session started without `language`, or game settings out of range. |
 | 501 | The game exists but can't be played yet. All six games above are playable. |
 
 Errors have the shape `{"detail": "<message>"}`.
@@ -420,5 +435,12 @@ The choices behind the rules above, and the reasons for them.
 - **Settings changes can't break scheduling.** Invalid values are rejected
   when saved. Words keep working when steps are removed. If a stored value
   is ever invalid, the defaults are used instead of failing.
+- **Starting and finishing a session are `POST`s.** Both change state:
+  starting creates a session, and asking for the result ends it. A `GET` must
+  be safe to repeat (RFC 9110), and clients and proxies may retry or prefetch
+  it. The result call is still idempotent, so a client can retry it safely.
+- **Sessions expire after 20 minutes without an answer, not 20 minutes after
+  they start.** A player who is still answering is never cut off; an
+  abandoned session is cleaned up by Redis on its own.
 - **Finishing early is allowed.** A player in a hurry can stop. Skipped words
   keep their schedule.

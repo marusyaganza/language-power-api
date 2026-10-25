@@ -83,7 +83,6 @@ __all__ = [
     "GameNotFoundError",
     "GameNotImplementedError",
     "SessionNotFoundError",
-    "SessionGameMismatchError",
     "QuestionNotFoundError",
     "SessionFinishedError",
     "QuestionAlreadyAnsweredError",
@@ -126,10 +125,6 @@ class GameNotImplementedError(GamesError):
 
 class SessionNotFoundError(GamesError):
     """The game session expired or never existed."""
-
-
-class SessionGameMismatchError(GamesError):
-    """The game session was started for a different game."""
 
 
 class QuestionNotFoundError(GamesError):
@@ -500,7 +495,7 @@ class AnswerCheck:
 
 
 async def check_answer(
-    user_id: int, session_id: str, game_id: int, word_id: int, answer: str
+    user_id: int, session_id: str, word_id: int, answer: str
 ) -> AnswerCheck:
     """Grade `answer` for the question about `word_id` and mark it answered.
 
@@ -515,15 +510,11 @@ async def check_answer(
     Raises:
         SessionNotFoundError: the session expired, never existed, or belongs
             to another user.
-        SessionGameMismatchError: the session belongs to a different game.
         SessionFinishedError: the session is already finished.
         QuestionNotFoundError: the session has no question for `word_id`.
         QuestionAlreadyAnsweredError: the question was already answered.
     """
     session_data = await _get_own_session(user_id, session_id)
-
-    if session_data["game_id"] != game_id:
-        raise SessionGameMismatchError("Session does not belong to this game")
 
     if session_data.get("finished"):
         raise SessionFinishedError("Session is already finished")
