@@ -5,9 +5,7 @@ It covers what each endpoint does, what each game sends and expects, and the
 rules behind scheduling and scoring. Implementation details are left out.
 
 All game endpoints require a logged-in user (the session cookie set by
-`/auth/login`). Every game uses only the logged-in user's own saved words.
-
----
+signup or login). Every game uses only the logged-in user's own saved words.
 
 ## The games
 
@@ -20,13 +18,11 @@ All game endpoints require a logged-in user (the session cookie set by
 | `image` | Name the Picture | Image URL | Typing the word | Words with an image |
 | `gender` | Noun Gender | The word (a noun) | Ticking masculine, feminine, or both | Words with a gender (Spanish only) |
 
-The games are listed from easiest to hardest: first recognising a word among
+The games are listed from easiest to hardest: first recognizing a word among
 options, then recalling it without help.
 
 A game session has 5 questions by default. If the user has fewer eligible
 words, the session has fewer questions.
-
----
 
 ## The flow of a game
 
@@ -40,8 +36,6 @@ Starting and finishing change state, so every step after the list is a
 
 The player can stop at any time. Requesting the result ends the session
 early (see [Finishing early](#finishing-early)).
-
----
 
 ## 1. List games: `GET /games?language={lang}`
 
@@ -79,8 +73,6 @@ returned, so the client can switch modes without another request:
   and `total_word_count >= min_word_count`.
 - In review mode, a game is playable when `total_word_count >= min_word_count`
   (and above 0).
-
----
 
 ## 2. Start a session: `POST /games/{game_id}/sessions`
 
@@ -124,8 +116,8 @@ Response (201):
 - `session_id` identifies the session in the answer and result URLs.
 - `id` of a question is the word's id. Send it back as `word_id` when
   answering.
-- `question` is a **list of strings** (definitions) or a **single string**
-  (a word, or an audio/image URL), depending on the game.
+- `question` is a list of strings (definitions) or a single string (a word,
+  or an audio/image URL), depending on the game.
 - `options` is set for `select_word`, `select_def` and `gender`, and `null`
   otherwise.
 - `alt` is set only in the `image` game (see [Broken images](#broken-images)).
@@ -178,8 +170,6 @@ For example, "the **heart** thought of as…" becomes "the ___ thought of as…"
 - **Rarely, a question has fewer than 4 options**, when the user's words
   don't provide enough distinct ones. The client should handle 2–4 options.
 
----
-
 ## 3. Answer a question: `POST /games/sessions/{session_id}/answers`
 
 ```json
@@ -216,8 +206,6 @@ Response:
 **Each question can be answered only once.** A second answer is rejected
 (409), since the first response already showed the correct answer.
 
----
-
 ## 4. Result: `POST /games/sessions/{session_id}/result`
 
 Ends the session if it's still running and returns its result. No body.
@@ -240,37 +228,34 @@ Ends the session if it's still running and returns its result. No body.
 - **`score_percent` counts `close` answers as correct.** It is
   (correct + close) ÷ total words, rounded half up, so 1 of 6 gives 17%.
   Unanswered questions count against the score.
-- `total_words` is every word in the session ("Learned words" on the
-  result screen).
+- `total_words` is every word in the session.
 - `questions` lists each word with its expected answer and how it was graded,
   or `"unanswered"`.
 
 ### Finishing early
 
-Requesting the result **ends the session**, even if some questions are
+Requesting the result ends the session, even if some questions are
 unanswered. After that:
 
 - no more answers are accepted (409);
-- unanswered words are reported as `"unanswered"` and **do not affect the
-  word's practice schedule**;
+- unanswered words are reported as `"unanswered"` and do not affect the
+  word's practice schedule;
 - the result can be requested again: the same call returns the same result,
   with no error.
 
----
-
 ## Modes
 
-Progress is tracked **per word and per game type**. Practicing a word in the
+Progress is tracked per word and per game type. Practicing a word in the
 audio game doesn't change when it is due in Type the Word.
 
 ### Spaced repetition (`mode=spaced`, the default)
 
-Only **due** words are used. A word is due if it was never practiced in this
+Only due words are used. A word is due if it was never practiced in this
 game, or its next review date has passed. The most overdue words come first.
 
 ### Review (`mode=review`)
 
-**All** the user's words are used, starting with the ones practiced least
+All the user's words are used, starting with the ones practiced least
 recently. Repeated review sessions therefore cycle through the vocabulary
 rather than showing the same words again.
 
@@ -281,8 +266,8 @@ of the review order.
 
 ### New words (`new_words_first`)
 
-Words never practiced in a game come **after** the others by default, and
-**before** them with `new_words_first=true`. In both cases, new words are
+Words never practiced in a game come after the others by default, and
+before them with `new_words_first=true`. In both cases, new words are
 picked in random order.
 
 ### How the schedule moves
@@ -298,10 +283,8 @@ With the default ("Recommended") settings:
   close answer grows it a little. A wrong answer halves it (at least 1 day),
   or, in strict mode, sends the word back to the first learning step.
 
-Progress is saved just after the answer response is sent, so a `GET /games`
-made at the same moment may not reflect the last answer yet.
-
----
+Progress is saved before the answer response is sent, so the next
+`GET /games` already reflects the answer.
 
 ## Spaced repetition settings
 
@@ -354,31 +337,12 @@ word follows the new settings from its next answer on. If the user removes
 learning steps, a word on a removed step continues from the last remaining
 one.
 
-Suggested note for the settings screen:
-
-> Changes apply to each word the next time you answer it. Reviews that are
-> already scheduled keep their dates.
-
-### Suggested tooltips
-
-- **Learning steps:** "How soon a new word comes back while you're still
-  learning it. Each correct answer moves it to the next step. A wrong answer
-  starts it over."
-- **Graduating interval:** "How long to wait after the last learning step
-  before reviewing the word again. From then on, the wait grows with each
-  correct answer, up to 90 days."
-- **Strict mode:** "When on, forgetting a word you had already learned sends
-  it back to the first learning step. When off, the wait before its next
-  review is cut in half instead."
-
----
-
 ## Session lifetime
 
-- A running session expires **20 minutes after its last activity**: when it
+- A running session expires 20 minutes after its last activity: when it
   was started, or its last answer. Each answer gives it another 20 minutes.
 - Once a session is finished (every question answered, or the result
-  requested), it is kept for **1 hour** so the result can still be read.
+  requested), it is kept for 1 hour so the result can still be read.
 - **An expired session is deleted.** Answering it or asking for its result
   returns 404, the same as for a session that never existed. Every answer
   was already saved as learning progress, but the session's result is gone.
@@ -386,20 +350,17 @@ Suggested note for the settings screen:
 - **A session can only be used by the user who started it.** Anyone else gets
   404, as if it didn't exist.
 
----
-
 ## Errors
 
 | Status | When |
 |---|---|
+| 403 | Not logged in, or the session cookie expired. |
 | 404 | Game doesn't exist. Session expired, never existed, or belongs to another user. The word isn't part of the session. |
 | 409 | Question already answered. Session already finished. Starting `select_word`/`select_def` with fewer words than `min_word_count`. |
 | 422 | Invalid request values, e.g. a session started without `language`, or game settings out of range. |
 | 501 | The game exists but can't be played yet. All six games above are playable. |
 
 Errors have the shape `{"detail": "<message>"}`.
-
----
 
 ## Design decisions
 
