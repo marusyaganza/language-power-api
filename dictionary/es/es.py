@@ -4,14 +4,14 @@ from dictionary.base import DictionaryProvider
 from words.word import Word, unique_definitions
 from dictionary.base import SearchResult
 from settings import settings
-from dictionary.helpers.mw import fetch_entries, format_name, extract_audio, extract_image, extract_image_desc, extract_definitions, has_definitions, is_suggestion_response, extract_gender
+from dictionary.helpers.mw import fetch_entries, format_entries, format_name, extract_audio, extract_image, extract_image_desc, extract_definitions, is_suggestion_response, extract_gender
 
 class SpanishDictionaryProvider(DictionaryProvider):
     async def fetch(self, query: str) -> SearchResult:
        raw_items = await self._fetch_raw(query)
        if is_suggestion_response(raw_items):
         return SearchResult(suggestions=raw_items)
-       return SearchResult(words=[self._format(item) for item in raw_items if has_definitions(item)])
+       return SearchResult(words=format_entries(raw_items, self._format))
     
     async def _fetch_raw(self, query: str) -> list:
         return await fetch_entries(settings.spanish_api_url, settings.spanish_api_key, query)

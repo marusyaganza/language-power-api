@@ -106,3 +106,73 @@ def test_mw_failures_raise_dictionary_error_without_the_key(serve, handler):
     # httpx's own messages contain the URL, and the URL contains the key.
     assert "secret" not in str(excinfo.value)
     assert excinfo.value.__cause__ is None
+
+
+# --------------------------------------------------------------------------- #
+# Entries with an unexpected shape
+# --------------------------------------------------------------------------- #
+
+from dictionary.en.en import EnglishDictionaryProvider  # noqa: E402
+from dictionary.es.es import SpanishDictionaryProvider  # noqa: E402
+
+PROVIDERS = [EnglishDictionaryProvider, SpanishDictionaryProvider]
+
+
+def entry(name="casa", **fields):
+    """A minimal well-formed MW entry."""
+    return {
+        "meta": {"id": f"{name}:1", "uuid": f"uuid-{name}", "stems": [name]},
+        "hwi": {"hw": name, "prs": [{"mw": name, "sound": {"audio": name}}]},
+        "fl": "noun",
+        "shortdef": [f"definition of {name}"],
+        **fields,
+    }
+
+
+def search(provider_class, monkeypatch, raw_items):
+    """Run the provider's real `fetch` on `raw_items` instead of an MW response."""
+    provider = provider_class()
+
+    async def fake_fetch_raw(query):
+        return raw_items
+
+    monkeypatch.setattr(provider, "_fetch_raw", fake_fetch_raw)
+    return asyncio.run(provider.fetch("casa"))
+
+
+# Regression: one malformed entry made the whole search a 500.
+@pytest.mark.parametrize("provider_class", PROVIDERS)
+def test_a_malformed_entry_is_skipped_and_logged(provider_class, monkeypatch, caplog):
+    broken = {k: v for k, v in entry("roto").items() if k != "meta"}
+    result = search(provider_class, monkeypatch, [entry("casa"), broken])
+    assert [w.name for w in result.words] == ["casa"]
+    assert "Skipped a malformed MW entry" in caplog.text
+
+
+@pytest.mark.parametrize("provider_class", PROVIDERS)
+def test_an_entry_without_pronunciation_is_still_a_word(provider_class, monkeypatch):
+    without_hwi = {k: v for k, v in entry("casa").items() if k != "hwi"}
+    [word] = search(provider_class, monkeypatch, [without_hwi]).words
+    assert word.name == "casa"
+    assert word.audio_url is None
+
+
+@pytest.mark.parametrize("provider_class", PROVIDERS)
+def test_strings_mixed_into_entries_are_skipped(provider_class, monkeypatch):
+    result = search(provider_class, monkeypatch, ["casas", entry("casa")])
+    assert [w.name for w in result.words] == ["casa"]
+
+
+@pytest.mark.parametrize("provider_class", PROVIDERS)
+def test_only_malformed_entries_is_a_dictionary_error(provider_class, monkeypatch):
+    meta_not_an_object = entry("casa", meta="casa:1")
+    no_meta = {k: v for k, v in entry("perro").items() if k != "meta"}
+    with pytest.raises(DictionaryError, match="malformed"):
+        search(provider_class, monkeypatch, [meta_not_an_object, no_meta, 42])
+
+
+@pytest.mark.parametrize("provider_class", PROVIDERS)
+def test_entries_without_definitions_are_no_error(provider_class, monkeypatch):
+    # Nothing to learn from them, but not malformed: an empty result ("not found").
+    no_defs = {k: v for k, v in entry("casa").items() if k != "shortdef"}
+    assert search(provider_class, monkeypatch, [no_defs]).words == []

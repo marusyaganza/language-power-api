@@ -1,11 +1,16 @@
+import logging
 import re
+from collections.abc import Callable
 from urllib.parse import quote
 
 import httpx
 
 from dictionary.base import DictionaryError
 from words.example import Example
+from words.word import Word
 from settings import settings
+
+logger = logging.getLogger(__name__)
 
 TAG_RE = re.compile(r'\{[^}]*\}')
 # Seconds to wait for MW; well under the frontend proxy's own timeout.
@@ -49,6 +54,40 @@ async def fetch_entries(api_url: str, api_key: str, query: str) -> list:
     if not isinstance(data, list):
         raise DictionaryError(f"MW answered with a JSON {type(data).__name__}, not a list")
     return data
+
+def format_entries(raw_items: list, format_entry: Callable[[dict], Word]) -> list[Word]:
+    """Format the entries of an MW response, skipping any with an unexpected shape.
+
+    `format_entry` is the language's own formatter. Entries without
+    definitions are left out, as there is nothing to learn from them. An entry
+    that isn't a dict, or that `format_entry` can't handle (a missing key, a
+    value of the wrong type), is skipped and logged, so one odd entry doesn't
+    fail the whole search.
+
+    Raises:
+        DictionaryError: every entry was skipped as malformed. Returning no
+            words would read as "word not found"; this is MW answering in a
+            shape the code doesn't know, so it is reported as a failure.
+    """
+    words: list[Word] = []
+    malformed = 0
+    for item in raw_items:
+        try:
+            if not isinstance(item, dict):
+                raise TypeError(f"entry is a {type(item).__name__}, not an object")
+            if has_definitions(item):
+                words.append(format_entry(item))
+        except (KeyError, TypeError, AttributeError, ValueError, IndexError) as exc:
+            malformed += 1
+            logger.warning("Skipped a malformed MW entry %r: %s: %s", _entry_id(item), type(exc).__name__, exc)
+    if raw_items and malformed == len(raw_items):
+        raise DictionaryError(f"MW answered with {malformed} malformed entries")
+    return words
+
+def _entry_id(item) -> str | None:
+    """The entry's `meta.id` ("casa:1"), if it has one, for log messages."""
+    meta = item.get('meta') if isinstance(item, dict) else None
+    return meta.get('id') if isinstance(meta, dict) else None
 
 def strip_mw_markup(raw: str) -> str:
     return TAG_RE.sub('', raw).strip()
@@ -148,7 +187,7 @@ def extract_audio(word, language, countryCode):
     if audio begins with "gg", the subdirectory should be "gg",
     if audio begins with a number or punctuation (eg, "_"), the subdirectory should be "number",
     """
-    prs = word.get('hwi').get('prs')
+    prs = (word.get('hwi') or {}).get('prs')  # some entries have no pronunciation
     audio_url = None
     audio = ''
     if prs:
@@ -172,7 +211,7 @@ def extract_transcription(word):
     """IPA where the dictionary gives it (Learner's), else MW's own respelling
     (Collegiate, e.g. "ˈhärt")."""
     transcription = None
-    prs = word.get('hwi').get('prs')
+    prs = (word.get('hwi') or {}).get('prs')  # some entries have no pronunciation
     if prs:
         transcription = prs[0].get('ipa') or prs[0].get('mw')
     return transcription
