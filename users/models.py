@@ -15,4 +15,8 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    words = relationship("Word", back_populates="user", cascade="all, delete-orphan", lazy="raise")
+    # passive_deletes: the database deletes a user's words (ON DELETE CASCADE),
+    # so deleting a user doesn't load thousands of words just to delete them.
+    words = relationship(
+        "Word", back_populates="user", cascade="all, delete-orphan", lazy="raise", passive_deletes=True
+    )

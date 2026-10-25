@@ -17,7 +17,7 @@ class Word(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
 
     uuid = Column(String, nullable=True, index=True)  # null => custom word
     name = Column(String, nullable=False, index=True)
