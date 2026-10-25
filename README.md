@@ -43,7 +43,7 @@ Some rules hold everywhere:
 - Python 3.12
 - FastAPI, Pydantic 2 and pydantic-settings, served by Uvicorn
 - SQLAlchemy 2.0 (async) with psycopg 3, and Alembic for migrations
-- PostgreSQL 16
+- PostgreSQL 18
 - Redis 7 for auth sessions and game sessions
 - httpx for the Merriam-Webster API
 - bcrypt for password hashing

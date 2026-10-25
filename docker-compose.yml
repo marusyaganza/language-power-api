@@ -8,7 +8,7 @@ services:
       - redis-data:/data
     command: redis-server --save 60 1  # optional: persist snapshot every 60s if ≥1 key changed
   postgres:
-      image: postgres:16-alpine
+      image: postgres:18-alpine  # same major version as Neon
       container_name: postgres-dev
       restart: unless-stopped
       environment:
@@ -18,8 +18,14 @@ services:
       ports:
         - "5432:5432"
       volumes:
-        - postgres-data:/var/lib/postgresql/data
+        # The 18 image keeps its data under /var/lib/postgresql/18/docker, so the
+        # volume is mounted one level up from where older images expected it.
+        - postgres18-data:/var/lib/postgresql
 
 volumes:
   redis-data:
+  postgres18-data:
+  # Postgres 16 data from before the upgrade, no longer mounted. Postgres can't
+  # open an older major version's files; delete it once the data is copied over
+  # (`docker volume rm py-lp_postgres-data`).
   postgres-data:

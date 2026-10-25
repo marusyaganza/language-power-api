@@ -24,7 +24,7 @@ jobs:
       # Same users and versions as docker-compose.yml, which is what
       # tests/conftest.py expects. The tests create language_app_test themselves.
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: app_user
           POSTGRES_PASSWORD: dev_password
