@@ -11,13 +11,18 @@ Rules that apply to every function below:
   about HTTP or cookies; the router decides status codes and sets the cookie.
 * `db` must be an `AsyncSession`, and `core.redis.redis_client` must be an
   asyncio client (`redis.asyncio.Redis`).
+
+Logins and signups are rate-limited in memory (`auth.rate_limit`, limits in
+`settings`): logins per email, signups all together.
 """
 import asyncio
+import math
 import secrets
 from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from auth.rate_limit import AttemptLimiter
 from auth.schemas import LoginRequest, UserCreate
 from core.redis import redis_client
 from settings import settings
@@ -29,6 +34,7 @@ __all__ = [
     "SignupClosedError",
     "EmailAlreadyRegisteredError",
     "InvalidCredentialsError",
+    "TooManyAttemptsError",
     "AuthResult",
     "signups_open",
     "mocks_enabled",
@@ -61,9 +67,30 @@ class InvalidCredentialsError(AuthError):
     """The email or password is wrong. Deliberately does not say which."""
 
 
+class TooManyAttemptsError(AuthError):
+    """Too many attempts recently; `retry_after` is the whole seconds to wait."""
+
+    def __init__(self, retry_after: int):
+        super().__init__("Too many attempts, try again later")
+        self.retry_after = retry_after
+
+
 # --------------------------------------------------------------------------- #
 # Signing up and logging in
 # --------------------------------------------------------------------------- #
+
+_login_limiter = AttemptLimiter(settings.login_attempt_limit, settings.login_attempt_window_seconds)
+_signup_limiter = AttemptLimiter(settings.signup_limit, settings.signup_window_seconds)
+# Every signup shares one count: the limit is on new accounts overall, and
+# needs nothing from the request that a caller could vary.
+_SIGNUP_KEY = "signup"
+
+
+def _count_attempt(limiter: AttemptLimiter, key: str) -> None:
+    """Count an attempt, or raise TooManyAttemptsError if the limit is reached."""
+    wait = limiter.acquire(key)
+    if wait is not None:
+        raise TooManyAttemptsError(retry_after=math.ceil(wait))
 
 @dataclass(frozen=True)
 class AuthResult:
@@ -94,12 +121,17 @@ async def signup(db: AsyncSession, user_in: UserCreate) -> AuthResult:
     with the same email can both pass it. The database's unique index then
     rejects the second insert, and that is reported the same way.
 
+    Every attempt while signups are open counts toward the signup limit,
+    including one for a taken email.
+
     Raises:
         SignupClosedError: signups are turned off.
+        TooManyAttemptsError: too many signups recently, from anyone.
         EmailAlreadyRegisteredError: the email belongs to an existing account.
     """
     if not signups_open():
         raise SignupClosedError("Signups are currently closed")
+    _count_attempt(_signup_limiter, _SIGNUP_KEY)
 
     if await users_service.get_user_by_email(db, user_in.email) is not None:
         raise EmailAlreadyRegisteredError("Email already registered")
@@ -118,9 +150,18 @@ async def login(db: AsyncSession, credentials: LoginRequest) -> AuthResult:
     response does not reveal which emails are registered. Timing is not
     equalized, though: an unknown email returns without hashing anything.
 
+    Every attempt counts toward the email's limit, not only failed ones:
+    the password check runs in a thread, so attempts made at the same time
+    would all start before any of them failed. The count is taken before the
+    database lookup and bcrypt, so a refused attempt costs nothing, and a
+    successful login starts it over.
+
     Raises:
+        TooManyAttemptsError: too many attempts for this email recently,
+            even if the password is right.
         InvalidCredentialsError: unknown email or wrong password.
     """
+    _count_attempt(_login_limiter, credentials.email)
     user = await users_service.get_user_by_email(db, credentials.email)
     # Password hashing is slow on purpose, so it runs in a thread to keep it
     # from stalling every other request on the event loop.
@@ -129,6 +170,7 @@ async def login(db: AsyncSession, credentials: LoginRequest) -> AuthResult:
     ):
         raise InvalidCredentialsError("Incorrect email or password")
 
+    _login_limiter.reset(credentials.email)
     return AuthResult(user=user, session_id=await create_session(user.id))
 
 

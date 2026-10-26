@@ -2,7 +2,9 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+import auth.service
 from settings import settings
+from auth.rate_limit import AttemptLimiter
 from auth.schemas import UserCreate
 from users import service as users_service
 from users.models import User
@@ -138,3 +140,80 @@ async def test_create_user_keeps_other_database_errors(db):
         await users_service.create_user(
             db, UserCreate.model_construct(email="Upper@example.com", password=PASSWORD)
         )
+
+
+# --------------------------------------------------------------------------- #
+# Rate limits
+# --------------------------------------------------------------------------- #
+
+async def login(client, email, password):
+    return await client.post("/auth/login", json={"email": email, "password": password})
+
+
+async def test_too_many_logins_for_one_email_are_a_429_even_with_the_right_password(make_client):
+    client = make_client()
+    user = await signup(client)
+    await client.post("/auth/logout")
+
+    for _ in range(settings.login_attempt_limit):
+        assert (await login(client, user["email"], "wrong-password")).status_code == 401
+
+    response = await login(client, user["email"], PASSWORD)
+    assert response.status_code == 429
+    assert response.json() == {"detail": "Too many attempts, try again later"}
+    retry_after = int(response.headers["retry-after"])
+    assert 0 < retry_after <= settings.login_attempt_window_seconds
+    assert (await client.get("/auth/me")).status_code == 403  # not logged in
+
+    # Other emails are counted separately, and the count ignores case.
+    assert (await login(client, "someone-else@example.com", PASSWORD)).status_code == 401
+    assert (await login(client, user["email"].upper(), PASSWORD)).status_code == 429
+
+
+async def test_a_successful_login_starts_the_count_over(make_client):
+    client = make_client()
+    user = await signup(client)
+
+    for _ in range(settings.login_attempt_limit - 1):
+        await login(client, user["email"], "wrong-password")
+    assert (await login(client, user["email"], PASSWORD)).status_code == 200
+
+    for _ in range(settings.login_attempt_limit - 1):
+        assert (await login(client, user["email"], "wrong-password")).status_code == 401
+    assert (await login(client, user["email"], PASSWORD)).status_code == 200
+
+
+async def test_a_refused_login_does_not_reach_the_database(make_client, monkeypatch):
+    client = make_client()
+    for _ in range(settings.login_attempt_limit):
+        await login(client, "target@example.com", "guess")
+
+    async def must_not_run(db, email):
+        raise AssertionError("looked up the user for a refused attempt")
+
+    monkeypatch.setattr(users_service, "get_user_by_email", must_not_run)
+    assert (await login(client, "target@example.com", "guess")).status_code == 429
+
+
+async def test_signups_are_limited_across_everyone(make_client, monkeypatch):
+    monkeypatch.setattr(auth.service, "_signup_limiter", AttemptLimiter(2, 3600))
+    await signup(make_client())
+    await signup(make_client())
+
+    response = await make_client().post(
+        "/auth/signup", json={"email": "third@example.com", "password": PASSWORD}
+    )
+    assert response.status_code == 429
+    assert int(response.headers["retry-after"]) > 0
+
+
+async def test_closed_signups_do_not_use_up_the_signup_limit(make_client, monkeypatch):
+    monkeypatch.setattr(auth.service, "_signup_limiter", AttemptLimiter(1, 3600))
+    monkeypatch.setattr(settings, "signup_enabled", False)
+    closed = await make_client().post(
+        "/auth/signup", json={"email": "closed@example.com", "password": PASSWORD}
+    )
+    assert closed.status_code == 403
+
+    monkeypatch.setattr(settings, "signup_enabled", True)
+    await signup(make_client())

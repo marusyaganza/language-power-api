@@ -26,6 +26,7 @@ from sqlalchemy.pool import NullPool
 
 import auth.service
 import games.session_store
+from auth.rate_limit import AttemptLimiter
 from core.database import AsyncSessionLocal, get_db
 from main import app
 from settings import settings
@@ -103,6 +104,13 @@ async def make_client(db, redis, monkeypatch):
     Each client keeps its own cookies, so two clients are two users.
     """
     monkeypatch.setattr(settings, "signup_enabled", True)
+    # Fresh rate limits for every test (the app's are shared by the process).
+    monkeypatch.setattr(auth.service, "_login_limiter", AttemptLimiter(
+        settings.login_attempt_limit, settings.login_attempt_window_seconds
+    ))
+    monkeypatch.setattr(auth.service, "_signup_limiter", AttemptLimiter(
+        settings.signup_limit, settings.signup_window_seconds
+    ))
 
     async def _get_db():
         yield db

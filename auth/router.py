@@ -22,6 +22,7 @@ _STATUS_FOR_ERROR: dict[type[service.AuthError], int] = {
     service.SignupClosedError: status.HTTP_403_FORBIDDEN,
     service.EmailAlreadyRegisteredError: status.HTTP_400_BAD_REQUEST,
     service.InvalidCredentialsError: status.HTTP_401_UNAUTHORIZED,
+    service.TooManyAttemptsError: status.HTTP_429_TOO_MANY_REQUESTS,
 }
 
 
@@ -31,13 +32,18 @@ def _http_errors():
 
     An error missing from `_STATUS_FOR_ERROR` becomes a 500, so a new error
     type added to the service is never silently reported as a client error.
+    A 429 tells the client how long to wait in a `Retry-After` header.
     """
     try:
         yield
     except service.AuthError as exc:
+        headers = None
+        if isinstance(exc, service.TooManyAttemptsError):
+            headers = {"Retry-After": str(exc.retry_after)}
         raise HTTPException(
             status_code=_STATUS_FOR_ERROR.get(type(exc), status.HTTP_500_INTERNAL_SERVER_ERROR),
             detail=str(exc),
+            headers=headers,
         ) from exc
 
 
@@ -47,7 +53,11 @@ async def signup(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    """Create an account and log in. 403 if signups are closed, 400 if the email is taken."""
+    """Create an account and log in.
+
+    403 if signups are closed, 400 if the email is taken, 429 (with
+    `Retry-After`) after too many signups.
+    """
     with _http_errors():
         result = await service.signup(db, user_in)
     set_session_cookie(response, result.session_id)
@@ -60,7 +70,11 @@ async def login(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    """Log in with email and password. 401 if either is wrong."""
+    """Log in with email and password.
+
+    401 if either is wrong, 429 (with `Retry-After`) after too many attempts
+    for this email.
+    """
     with _http_errors():
         result = await service.login(db, credentials)
     set_session_cookie(response, result.session_id)

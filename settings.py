@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     # forwards (core.proxy_signature). Unset: requests aren't checked.
     proxy_signature_secret: SecretStr | None = None
 
+    # Rate limits, counted in memory (auth.rate_limit). Every login attempt
+    # counts, per email; a successful login starts the count over.
+    login_attempt_limit: int = 5
+    login_attempt_window_seconds: int = 15 * 60
+    # All signups together, from anyone: only matters where signup is open.
+    signup_limit: int = 30
+    signup_window_seconds: int = 60 * 60
+
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()  # automatically loads and validates from .env
