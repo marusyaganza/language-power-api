@@ -9,7 +9,10 @@ from users.models import User
 
 
 def _not_authenticated() -> HTTPException:
-    return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated")
+    # 401: the caller is not known (no valid session), as opposed to 403, a
+    # known caller who is refused (e.g. signup closed). There is no standard
+    # `WWW-Authenticate` scheme for a session cookie, so none is sent.
+    return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
 
 async def get_current_user(
@@ -22,7 +25,7 @@ async def get_current_user(
     users stay logged in.
 
     Raises:
-        HTTPException: 403 if there is no cookie, the session is unknown or
+        HTTPException: 401 if there is no cookie, the session is unknown or
             expired, or its user no longer exists. These cases are not
             distinguished, so a caller learns nothing about which sessions
             exist.

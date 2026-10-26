@@ -354,7 +354,7 @@ one.
 
 | Status | When |
 |---|---|
-| 403 | Not logged in, or the session cookie expired. |
+| 401 | Not logged in, or the session cookie expired. |
 | 404 | Game doesn't exist. Session expired, never existed, or belongs to another user. The word isn't part of the session. |
 | 409 | Question already answered. Session already finished. Starting `select_word`/`select_def` with fewer words than `min_word_count`. |
 | 422 | Invalid request values, e.g. a session started without `language`, or game settings out of range. |

@@ -20,7 +20,7 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 _STATUS_FOR_ERROR: dict[type[service.AuthError], int] = {
     service.SignupClosedError: status.HTTP_403_FORBIDDEN,
-    service.EmailAlreadyRegisteredError: status.HTTP_400_BAD_REQUEST,
+    service.EmailAlreadyRegisteredError: status.HTTP_409_CONFLICT,
     service.InvalidCredentialsError: status.HTTP_401_UNAUTHORIZED,
     service.TooManyAttemptsError: status.HTTP_429_TOO_MANY_REQUESTS,
 }
@@ -55,7 +55,7 @@ async def signup(
 ):
     """Create an account and log in.
 
-    403 if signups are closed, 400 if the email is taken, 429 (with
+    403 if signups are closed, 409 if the email is taken, 429 (with
     `Retry-After`) after too many signups.
     """
     with _http_errors():

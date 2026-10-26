@@ -22,7 +22,7 @@ async def test_signup_logs_in_and_logout_ends_session(make_client):
     assert me.json() == user
 
     assert (await client.post("/auth/logout")).status_code == 200
-    assert (await client.get("/auth/me")).status_code == 403
+    assert (await client.get("/auth/me")).status_code == 401
 
 
 async def test_login_checks_the_password(make_client):
@@ -32,7 +32,7 @@ async def test_login_checks_the_password(make_client):
 
     wrong = await client.post("/auth/login", json={"email": user["email"], "password": "nope"})
     assert wrong.status_code == 401
-    assert (await client.get("/auth/me")).status_code == 403
+    assert (await client.get("/auth/me")).status_code == 401
 
     right = await client.post("/auth/login", json={"email": user["email"], "password": PASSWORD})
     assert right.status_code == 200
@@ -62,7 +62,7 @@ async def test_password_too_long_for_bcrypt_is_a_422_not_a_500(make_client):
 async def test_signup_rejects_a_taken_email(make_client):
     user = await signup(make_client())
     again = await make_client().post("/auth/signup", json={"email": user["email"], "password": PASSWORD})
-    assert again.status_code == 400
+    assert again.status_code == 409
 
 
 async def test_email_case_does_not_matter(make_client):
@@ -75,7 +75,7 @@ async def test_email_case_does_not_matter(make_client):
     login = await client.post("/auth/login", json={"email": "MIXED@example.COM", "password": PASSWORD})
     assert login.status_code == 200
     again = await make_client().post("/auth/signup", json={"email": "mixed@EXAMPLE.com", "password": PASSWORD})
-    assert again.status_code == 400
+    assert again.status_code == 409
 
 
 async def test_signup_password_shorter_than_8_characters_is_a_422(make_client):
@@ -103,12 +103,12 @@ async def test_signup_can_be_closed(make_client, monkeypatch):
 
 async def test_requests_without_a_valid_session_are_rejected(make_client):
     client = make_client()
-    assert (await client.get("/words/vocabulary", params={"language": "es"})).status_code == 403
+    assert (await client.get("/words/vocabulary", params={"language": "es"})).status_code == 401
     client.cookies.set(settings.session_cookie_name, "made-up-session-id")
-    assert (await client.get("/auth/me")).status_code == 403
+    assert (await client.get("/auth/me")).status_code == 401
 
 
-async def test_signup_race_for_one_email_is_a_400_not_a_500(make_client, monkeypatch):
+async def test_signup_race_for_one_email_is_a_409_not_a_500(make_client, monkeypatch):
     # Two simultaneous signups can both pass the "is this email taken?" check.
     # Simulate the second one by making that check miss.
     first = make_client()
@@ -121,7 +121,7 @@ async def test_signup_race_for_one_email_is_a_400_not_a_500(make_client, monkeyp
     second = await make_client().post(
         "/auth/signup", json={"email": user["email"], "password": PASSWORD}
     )
-    assert second.status_code == 400
+    assert second.status_code == 409
     assert second.json() == {"detail": "Email already registered"}
     assert (await first.get("/auth/me")).json()["id"] == user["id"]
 
@@ -163,7 +163,7 @@ async def test_too_many_logins_for_one_email_are_a_429_even_with_the_right_passw
     assert response.json() == {"detail": "Too many attempts, try again later"}
     retry_after = int(response.headers["retry-after"])
     assert 0 < retry_after <= settings.login_attempt_window_seconds
-    assert (await client.get("/auth/me")).status_code == 403  # not logged in
+    assert (await client.get("/auth/me")).status_code == 401  # not logged in
 
     # Other emails are counted separately, and the count ignores case.
     assert (await login(client, "someone-else@example.com", PASSWORD)).status_code == 401
