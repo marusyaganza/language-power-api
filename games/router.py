@@ -29,6 +29,7 @@ from games.schemas import (
     GameSettingsPreset,
     GameSettingsUpdate,
 )
+from words.language import Language
 
 router = APIRouter(prefix="/games", tags=["games"])
 # The settings belong to the logged-in user, hence /users/me rather than /games.
@@ -63,7 +64,7 @@ def _http_errors():
 
 @router.get("", response_model=list[GameOut])
 async def list_games(
-    language: str = Query(...),
+    language: Language = Query(...),
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

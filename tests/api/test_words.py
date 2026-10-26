@@ -151,9 +151,13 @@ async def test_search_without_mock_data_lists_the_queries_that_have_it(client):
     assert "heart" in response.json()["mock_queries"]
 
 
-async def test_search_in_an_unsupported_language(client):
-    response = await client.get("/words/search", params={"query": "x", "language": "xx"})
-    assert response.status_code == 400
+async def test_an_unsupported_language_is_rejected_before_the_service(client):
+    search = await client.get("/words/search", params={"query": "x", "language": "xx"})
+    vocabulary = await client.get("/words/vocabulary", params={"language": "xx"})
+    save = await client.post(
+        "/words/save", json={"name": "x", "language": "xx", "fl": "noun", "defs": ["x"]}
+    )
+    assert [search.status_code, vocabulary.status_code, save.status_code] == [422, 422, 422]
 
 
 class _BrokenProvider(DictionaryProvider):

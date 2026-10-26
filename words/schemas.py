@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, field_validator, BeforeValidator
 from typing import Annotated, Literal
 from enum import Enum
 
+from words.language import Language
 from words.word import unique_definitions
 
 def _empty_str_to_none(value):
@@ -23,7 +24,7 @@ class ExampleItem(BaseModel):
 class WordCreate(BaseModel):
     uuid: str | None = None
     name: str
-    language: str
+    language: Language
     stems: list[str] = []
     defs: list[str] = Field(min_length=1)
     fl: str

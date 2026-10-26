@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth.dependencies import get_current_user
 from core.database import get_db
 from words import service
+from words.language import Language
 from words.schemas import (
     SortOrder,
     VocabularyPage,
@@ -52,13 +53,13 @@ def _http_errors():
 @router.get("/words/search", response_model=WordSearchResponse)
 async def search_words(
     query: str,
-    language: str,
+    language: Language,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     """Search the dictionary, flagging words the user has already saved.
 
-    400 if the language is unsupported, 404 if the dictionary has no entry,
+    404 if the dictionary has no entry,
     503 if the dictionary itself failed (worth retrying later).
     Spelling suggestions are a normal 200 response.
     """
@@ -81,7 +82,7 @@ async def create_word(
 
 @router.get("/words/vocabulary", response_model=VocabularyPage)
 async def list_vocabulary(
-    language: str,
+    language: Language,
     query: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     sort_by: VocabularySortBy = Query(default=VocabularySortBy.created_at),

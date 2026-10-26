@@ -68,6 +68,13 @@ async def test_start_needs_a_language(client, games):
     assert (await client.post(f"/games/{gid}/sessions", json={})).status_code == 422
 
 
+async def test_an_unsupported_language_is_rejected(client, games):
+    gid = await game_id(client, "type_word")
+    listed = await client.get("/games", params={"language": "xx"})
+    started = await client.post(f"/games/{gid}/sessions", json={"language": "xx"})
+    assert [listed.status_code, started.status_code] == [422, 422]
+
+
 async def test_old_game_session_routes_are_gone(client, games):
     gid, session = await start(client, "type_word")
     assert (await client.get(f"/games/{gid}", params={"language": "es"})).status_code in (404, 405)

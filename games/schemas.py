@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from words.schemas import ExampleItem
 from games.scoring import AnswerGrade
 from games.spaced_repetition import DEFAULT_CONFIG
+from words.language import Language
 
 class GameMode(str, Enum):
     SPACED = "spaced"  # only words that are due
@@ -43,7 +44,7 @@ class QuestionOut(BaseModel):
     additional_info: QuestionAdditionalInfo
 
 class GameSessionCreate(BaseModel):
-    language: str
+    language: Language
     mode: GameMode = GameMode.SPACED
     new_words_first: bool = False  # words never practiced in this game first
 
