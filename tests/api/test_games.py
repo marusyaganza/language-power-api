@@ -1,8 +1,8 @@
 # tests/api/test_games.py
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
-from games.models import ReviewLog, WordProgress
+from games.models import Game, ReviewLog, WordProgress
 from games.seed import sync_games
 from games.session_store import GAME_SESSION_TTL_SECONDS, _game_session_key
 from tests.api.conftest import save_word, signup
@@ -189,7 +189,7 @@ async def test_select_def_options_contain_the_answer(client, games):
         assert response["grade"] == "correct"
 
 
-async def test_select_def_options_consider_the_whole_pool(client, games):
+async def test_select_def_options_consider_the_whole_pool(client, db, games):
     # "ente" means "being", which is also a meaning of "ser" the noun. In the
     # question for "ser" the verb, the player only sees "ser", so "being" would
     # be a second correct option. Excluding it needs both "ser" entries from
@@ -201,6 +201,11 @@ async def test_select_def_options_consider_the_whole_pool(client, games):
     await save_word(client, "ente", defs=["being"])
     for name, meaning in [("perro", "dog"), ("gato", "cat"), ("casa", "house")]:
         await save_word(client, name, defs=[meaning])
+    # More questions than words, so "ser" the verb is always asked (5 of 6
+    # words would leave it out one time in six).
+    await db.execute(
+        update(Game).where(Game.game_type == "select_def").values(default_config={"words_per_session": 10})
+    )
 
     _gid, session = await start(client, "select_def")
     [question] = [q for q in session["questions"] if q["id"] == ser_verb["id"]]

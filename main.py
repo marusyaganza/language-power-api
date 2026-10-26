@@ -5,7 +5,11 @@ from games.router import router as games_router, settings_router as game_setting
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.proxy_signature import require_proxy_signature
+from core.sentry import init_sentry
 from settings import settings
+
+# Before the app is created, so Sentry's FastAPI integration sees all of it.
+init_sentry(settings)
 
 
 if settings.docs_enabled:

@@ -20,6 +20,11 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
+# The commit the image is built from, reported to Sentry as the release.
+# deploy.yml passes it; a local build without it reports no release.
+ARG GIT_SHA=""
+ENV SENTRY_RELEASE=$GIT_SHA
+
 RUN useradd --system --uid 10001 --no-create-home app
 USER app
 

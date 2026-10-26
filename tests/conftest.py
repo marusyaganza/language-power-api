@@ -26,6 +26,8 @@ os.environ.update({
     # Set as a URL because the database number in a URL overrides a `db=`
     # argument, so passing db=15 next to the dev URL would flush the dev data.
     "REDIS_URL": os.environ.get("TEST_REDIS_URL", "redis://localhost:6379/15"),
+    # Never report test errors to Sentry, even with a DSN in `.env`.
+    "SENTRY_DSN": "",
 })
 
 from dictionary.en.mock import MockEnglishDictionaryProvider  # noqa: E402

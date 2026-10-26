@@ -77,7 +77,8 @@ jobs:
           IMAGE="$GCP_REGION-docker.pkg.dev/$GCP_PROJECT_ID/$ARTIFACT_REPOSITORY/$SERVICE_NAME:$GITHUB_SHA"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
           gcloud auth configure-docker "$GCP_REGION-docker.pkg.dev" --quiet
-          docker build --tag "$IMAGE" .
+          # GIT_SHA becomes SENTRY_RELEASE in the image (see Dockerfile).
+          docker build --build-arg GIT_SHA="$GITHUB_SHA" --tag "$IMAGE" .
           docker push "$IMAGE"
 
       # Deploys the exact image just built. Cloud Run starts the new revision
@@ -98,7 +99,7 @@ jobs:
             --cpu-boost \
             --timeout 60 \
             --env-vars-file "deploy/$TARGET.env.yaml" \
-            --set-secrets "DATABASE_URL=DATABASE_URL:latest,REDIS_URL=REDIS_URL:latest,ENGLISH_API_KEY=ENGLISH_API_KEY:latest,SPANISH_API_KEY=SPANISH_API_KEY:latest,PROXY_SIGNATURE_SECRET=PROXY_SIGNATURE_SECRET:latest" \
+            --set-secrets "DATABASE_URL=DATABASE_URL:latest,REDIS_URL=REDIS_URL:latest,ENGLISH_API_KEY=ENGLISH_API_KEY:latest,SPANISH_API_KEY=SPANISH_API_KEY:latest,PROXY_SIGNATURE_SECRET=PROXY_SIGNATURE_SECRET:latest,SENTRY_DSN=SENTRY_DSN:latest" \
             --labels "commit=${GITHUB_SHA::12}" \
             --quiet
 

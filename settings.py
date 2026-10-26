@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     signup_limit: int = 30
     signup_window_seconds: int = 60 * 60
 
+    # Error reporting (core.sentry). No DSN: nothing is sent.
+    sentry_dsn: SecretStr | None = None
+    sentry_environment: str = "local"  # personal, demo
+    # The commit the image was built from; the Dockerfile sets it from GIT_SHA.
+    sentry_release: str | None = None
+
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()  # automatically loads and validates from .env
