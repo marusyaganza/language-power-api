@@ -6,7 +6,7 @@ from dictionary.es.mock import MockSpanishDictionaryProvider
 
 
 def build_providers():
-    if settings.use_mocks == 'True':
+    if settings.use_mocks:
         return {
             'en': MockEnglishDictionaryProvider(),
             'es': MockSpanishDictionaryProvider()

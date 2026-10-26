@@ -6,6 +6,9 @@ from dictionary.base import SearchResult
 from settings import settings
 from dictionary.helpers.mw import fetch_entries, format_entries, format_name, extract_audio, extract_image, extract_image_desc, extract_definitions, is_suggestion_response, extract_gender
 
+# Merriam-Webster's Spanish-English Dictionary (MW API docs).
+API_URL = 'https://www.dictionaryapi.com/api/v3/references/spanish/json'
+
 class SpanishDictionaryProvider(DictionaryProvider):
     async def fetch(self, query: str) -> SearchResult:
        raw_items = await self._fetch_raw(query)
@@ -14,7 +17,7 @@ class SpanishDictionaryProvider(DictionaryProvider):
        return SearchResult(words=format_entries(raw_items, self._format))
     
     async def _fetch_raw(self, query: str) -> list:
-        return await fetch_entries(settings.spanish_api_url, settings.spanish_api_key, query)
+        return await fetch_entries(API_URL, settings.spanish_api_key.get_secret_value(), query)
     
     def _format(self, word):
         meta = word['meta']

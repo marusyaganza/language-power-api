@@ -5,17 +5,12 @@ import os
 # Tests never use the real Merriam-Webster API. This must run before any app
 # import: `settings` and `PROVIDERS` are built once, at import time. Real
 # environment variables take priority over `.env`, and assigning (rather than
-# setdefault) overrides the shell too, so the real keys are never loaded.
-# `.invalid` never resolves, so a request that slips through fails at once.
-# With every required setting given here, tests also run without a `.env`.
+# setdefault) overrides the shell too, so the real keys are never loaded,
+# even though mock mode does not need keys. Tests also run without a `.env`.
 os.environ.update({
-    "USE_MOCKS": "True",
+    "USE_MOCKS": "true",
     "SPANISH_API_KEY": "test-key-not-used",
     "ENGLISH_API_KEY": "test-key-not-used",
-    "SPANISH_API_URL": "https://mw-api.invalid",
-    "ENGLISH_API_URL": "https://mw-api.invalid",
-    "AUDIO_ENDPOINT": "https://mw-media.invalid/audio",
-    "IMG_ENDPOINT": "https://mw-media.invalid/img",
     # The app (and Alembic) only ever see the test database, so no test can
     # reach the dev data. tests/api/conftest.py recreates it on every run.
     "DATABASE_URL": os.environ.get(

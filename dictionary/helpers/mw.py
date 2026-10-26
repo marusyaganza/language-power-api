@@ -8,7 +8,6 @@ import httpx
 from dictionary.base import DictionaryError
 from words.example import Example
 from words.word import Word
-from settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +15,8 @@ TAG_RE = re.compile(r'\{[^}]*\}')
 # Seconds to wait for MW; well under the frontend proxy's own timeout.
 REQUEST_TIMEOUT_SECONDS = 10
 
+# Pronunciation audio, by the `sound.audio` of an entry (MW API docs, "prs").
+AUDIO_URL = 'https://media.merriam-webster.com/audio/prons'
 # Direct link to an illustration, by the `art.artid` of an entry (MW API docs, "art").
 ART_URL = 'https://www.merriam-webster.com/assets/mw/static/art/dict'
 
@@ -201,7 +202,7 @@ def extract_audio(word, language, countryCode):
             if not subdir.isalpha():
                 subdir = 'number'
 
-            audio_url = f'{settings.audio_endpoint}/{language}/{countryCode}/mp3/{subdir}/{audio}.mp3'
+            audio_url = f'{AUDIO_URL}/{language}/{countryCode}/mp3/{subdir}/{audio}.mp3'
     return audio_url
 
 def format_name(str):

@@ -106,12 +106,8 @@ def signups_open() -> bool:
 
 
 def mocks_enabled() -> bool:
-    """Whether dictionary lookups use mock data (the `use_mocks` setting).
-
-    Read the same way as in `dictionary.providers`: only the exact string
-    "True" turns mocks on.
-    """
-    return settings.use_mocks == "True"
+    """Whether dictionary lookups use mock data (the `use_mocks` setting)."""
+    return settings.use_mocks
 
 
 async def signup(db: AsyncSession, user_in: UserCreate) -> AuthResult:

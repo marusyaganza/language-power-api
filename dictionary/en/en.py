@@ -5,6 +5,9 @@ from words.word import Word, unique_definitions
 from dictionary.base import SearchResult
 from settings import settings
 
+# Merriam-Webster's Collegiate Dictionary (MW API docs).
+API_URL = 'https://dictionaryapi.com/api/v3/references/collegiate/json'
+
 class EnglishDictionaryProvider(DictionaryProvider):
     async def fetch(self, query: str) -> SearchResult:
         raw_items = await self._fetch_raw(query)
@@ -15,7 +18,7 @@ class EnglishDictionaryProvider(DictionaryProvider):
         return SearchResult(words=format_entries(raw_items, self._format))
     
     async def _fetch_raw(self, query: str) -> list:
-        return await fetch_entries(settings.english_api_url, settings.english_api_key, query)
+        return await fetch_entries(API_URL, settings.english_api_key.get_secret_value(), query)
     
     def _format(self, word):
         meta = word['meta']

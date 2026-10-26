@@ -1,14 +1,15 @@
-from pydantic import SecretStr
+from typing import Self
+
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    spanish_api_key: str
-    spanish_api_url: str
-    english_api_key: str
-    english_api_url: str
-    audio_endpoint: str
-    img_endpoint: str
-    use_mocks: str
+    # True: dictionary lookups read recorded responses (dictionary/fixtures)
+    # and need no keys. False: they call Merriam-Webster with the keys below.
+    use_mocks: bool = False
+    english_api_key: SecretStr | None = None
+    spanish_api_key: SecretStr | None = None
+
     database_url: str = "postgresql+psycopg://app_user:dev_password@localhost:5432/language_app"
     signup_enabled: bool = True
 
@@ -46,5 +47,16 @@ class Settings(BaseSettings):
     sentry_release: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env")
+
+    @model_validator(mode="after")
+    def keys_required_without_mocks(self) -> Self:
+        missing = [
+            name.upper()
+            for name in ("english_api_key", "spanish_api_key")
+            if getattr(self, name) is None
+        ]
+        if not self.use_mocks and missing:
+            raise ValueError(f"{', '.join(missing)} must be set when USE_MOCKS is off")
+        return self
 
 settings = Settings()  # automatically loads and validates from .env

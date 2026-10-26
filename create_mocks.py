@@ -11,6 +11,8 @@ import json
 
 import httpx
 
+from dictionary.en.en import API_URL as ENGLISH_API_URL
+from dictionary.es.es import API_URL as SPANISH_API_URL
 from dictionary.mock import FIXTURES_DIR  # where the mock providers read them
 from settings import settings
 
@@ -42,8 +44,8 @@ WORDS = {
 }
 
 API_CONFIG = {
-    "en": {"url": settings.english_api_url, "key": settings.english_api_key},
-    "es": {"url": settings.spanish_api_url, "key": settings.spanish_api_key},
+    "en": {"url": ENGLISH_API_URL, "key": settings.english_api_key.get_secret_value()},
+    "es": {"url": SPANISH_API_URL, "key": settings.spanish_api_key.get_secret_value()},
 }
 
 # keep this modest so you don't trip a rate limit on a free-tier API key
