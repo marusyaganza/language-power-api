@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth.schemas import UserCreate
 from users.models import User
 
-# The unique index on users.email (models: `email = Column(..., unique=True, index=True)`).
+# The unique index on users.email (`email: Mapped[str] = mapped_column(unique=True, index=True)` in users/models.py).
 EMAIL_UNIQUE_INDEX = "ix_users_email"
 
 __all__ = [

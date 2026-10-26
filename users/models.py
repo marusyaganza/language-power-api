@@ -1,7 +1,15 @@
-from sqlalchemy import CheckConstraint, Column, Integer, String, DateTime
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from sqlalchemy import CheckConstraint, DateTime
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+
 from core.database import Base
+
+if TYPE_CHECKING:
+    from words.models import Word
+
 
 class User(Base):
     __tablename__ = "users"
@@ -10,13 +18,13 @@ class User(Base):
         CheckConstraint("email = lower(email)", name="ck_users_email_lowercase"),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    email: Mapped[str] = mapped_column(unique=True, index=True)
+    hashed_password: Mapped[str]
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # passive_deletes: the database deletes a user's words (ON DELETE CASCADE),
     # so deleting a user doesn't load thousands of words just to delete them.
-    words = relationship(
-        "Word", back_populates="user", cascade="all, delete-orphan", lazy="raise", passive_deletes=True
+    words: Mapped[list["Word"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", lazy="raise", passive_deletes=True
     )
