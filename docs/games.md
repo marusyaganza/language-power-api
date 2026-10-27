@@ -18,6 +18,10 @@ signup or login). Every game uses only the logged-in user's own saved words.
 | `image` | Name the Picture | Image URL | Typing the word | Words with an image |
 | `gender` | Noun Gender | The word (a noun) | Ticking masculine, feminine, or both | Words with a gender (Spanish only) |
 
+Images come from the English dictionary, which has them for some words only.
+The Spanish dictionary has none, so a Spanish word has an image only if the
+user adds one when editing the word.
+
 The games are listed from easiest to hardest: first recognizing a word among
 options, then recalling it without help.
 

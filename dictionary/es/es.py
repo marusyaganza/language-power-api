@@ -5,8 +5,6 @@ from dictionary.helpers.mw import (
     extract_definitions,
     extract_examples,
     extract_gender,
-    extract_image,
-    extract_image_desc,
     fetch_entries,
     format_entries,
     format_name,
@@ -15,7 +13,8 @@ from dictionary.helpers.mw import (
 from settings import settings
 from words.language import Language
 
-# Merriam-Webster's Spanish-English Dictionary (MW API docs).
+# Merriam-Webster's Spanish-English Dictionary (MW API docs). It has no
+# illustrations (no `art`), so entries never have an image.
 API_URL = "https://www.dictionaryapi.com/api/v3/references/spanish/json"
 
 
@@ -39,8 +38,6 @@ class SpanishDictionaryProvider(DictionaryProvider):
         defs = unique_definitions(extract_definitions(word))
         audio_url = extract_audio(word, language, "me")
         examples = extract_examples(word)
-        img_url = extract_image(word)
-        img_desc = extract_image_desc(word)
         gender = extract_gender(fl)
 
         return DictionaryEntry(
@@ -51,8 +48,6 @@ class SpanishDictionaryProvider(DictionaryProvider):
             stems=stems,
             defs=defs,
             audio_url=audio_url,
-            img_url=img_url,
-            img_desc=img_desc,
             examples=examples,
             gender=gender,
         )
