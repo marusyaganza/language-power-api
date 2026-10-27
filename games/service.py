@@ -51,7 +51,6 @@ from games.schemas import (
     GameSettingsUpdate,
     QuestionAdditionalInfo,
     QuestionOut,
-    QuestionResult,
 )
 from games.scoring import (
     AnswerGrade,
@@ -556,19 +555,11 @@ async def get_session_result(user_id: int, session_id: str) -> GameResultOut:
 
 
 def _summarize(questions: list[dict]) -> GameResultOut:
-    results = [
-        QuestionResult(
-            word_id=q["word_id"],
-            answer=q["answer"],
-            grade=q.get("grade", "unanswered"),
-        )
-        for q in questions
-    ]
     counts = {grade: 0 for grade in (*AnswerGrade, "unanswered")}
-    for result in results:
-        counts[result.grade] += 1
+    for question in questions:
+        counts[question.get("grade", "unanswered")] += 1
 
-    total = len(results)
+    total = len(questions)
     passed = counts[AnswerGrade.CORRECT] + counts[AnswerGrade.CLOSE]
     return GameResultOut(
         total_words=total,
@@ -577,7 +568,6 @@ def _summarize(questions: list[dict]) -> GameResultOut:
         wrong=counts[AnswerGrade.WRONG],
         unanswered=counts["unanswered"],
         score_percent=_percent_half_up(passed, total),
-        questions=results,
     )
 
 

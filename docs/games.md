@@ -217,11 +217,7 @@ Ends the session if it's still running and returns its result. No body.
   "close": 1,
   "wrong": 1,
   "unanswered": 1,
-  "score_percent": 67,
-  "questions": [
-    { "word_id": 67, "answer": "heart", "grade": "correct" },
-    { "word_id": 68, "answer": "ballena", "grade": "unanswered" }
-  ]
+  "score_percent": 67
 }
 ```
 
@@ -229,8 +225,6 @@ Ends the session if it's still running and returns its result. No body.
   (correct + close) ÷ total words, rounded half up, so 1 of 6 gives 17%.
   Unanswered questions count against the score.
 - `total_words` is every word in the session.
-- `questions` lists each word with its expected answer and how it was graded,
-  or `"unanswered"`.
 
 ### Finishing early
 

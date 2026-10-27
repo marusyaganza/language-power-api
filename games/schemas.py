@@ -1,7 +1,6 @@
 from datetime import datetime
 from enum import Enum
 from itertools import pairwise
-from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -72,12 +71,6 @@ class AnswerResponse(BaseModel):
     session_complete: bool
 
 
-class QuestionResult(BaseModel):
-    word_id: int
-    answer: str
-    grade: AnswerGrade | Literal["unanswered"]
-
-
 class GameResultOut(BaseModel):
     """The result of a finished game session.
 
@@ -91,7 +84,6 @@ class GameResultOut(BaseModel):
     wrong: int
     unanswered: int
     score_percent: int
-    questions: list[QuestionResult]
 
 
 MAX_LEARNING_STEPS = 5

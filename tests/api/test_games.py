@@ -288,6 +288,7 @@ async def test_result_finishes_the_session_and_counts_unanswered(client, games):
     body = response.json()
     assert (body["total_words"], body["correct"], body["wrong"], body["unanswered"]) == (3, 1, 1, 1)
     assert body["score_percent"] == 33
+    assert "questions" not in body  # it would reveal the unanswered words' answers
 
     # Finished: the last question takes no more answers.
     assert (await answer(client, session, questions[2]["id"], "x")).status_code == 409
