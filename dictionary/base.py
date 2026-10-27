@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Any
 
 from dictionary.entry import DictionaryEntry
+from words.language import Language
 
 
 @dataclass
@@ -34,7 +36,19 @@ class DictionaryError(Exception):
 
 
 class DictionaryProvider(ABC):
-    @abstractmethod
+    """One language's dictionary, backed by one external API.
+
+    Each language has its own provider, so a language can change API without
+    touching the others. The rest of the app only calls `fetch`.
+
+    A lookup is split in two so the mock providers (`dictionary.mock`) can
+    replace the request with a recorded answer and still run the real
+    parsing: `_fetch_raw` returns the API's answer as it was received (what
+    the fixtures store), and `_parse` turns it into a `SearchResult`.
+    """
+
+    language: Language
+
     async def fetch(self, query: str) -> SearchResult:
         """Look `query` up and return the entries or suggestions.
 
@@ -42,3 +56,17 @@ class DictionaryProvider(ABC):
             DictionaryError: the dictionary is unreachable, timed out, or
                 answered with an error or an unexpected response.
         """
+        return self._parse(await self._fetch_raw(query))
+
+    @abstractmethod
+    async def _fetch_raw(self, query: str) -> Any:
+        """Request `query` from the API and return its answer, unparsed.
+
+        Raises:
+            DictionaryError: as for `fetch`. The message must never contain
+                credentials.
+        """
+
+    @abstractmethod
+    def _parse(self, raw: Any) -> SearchResult:
+        """Turn an answer from `_fetch_raw` into entries or suggestions."""

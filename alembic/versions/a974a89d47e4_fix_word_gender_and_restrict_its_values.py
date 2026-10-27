@@ -17,7 +17,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-# Same rule as dictionary.helpers.mw.extract_gender. Words whose part of
+# Same rule as dictionary.merriam_webster.api.extract_gender. Words whose part of
 # speech names no gender keep a valid gender (custom words) and lose an
 # invalid one, so the constraint below can be added.
 _GENDER_FROM_FL = """

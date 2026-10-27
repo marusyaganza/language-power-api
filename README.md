@@ -61,14 +61,13 @@ Some rules hold everywhere:
 | `users/` | User model, password hashing and user lookups |
 | `words/` | Dictionary search and the saved vocabulary |
 | `games/` | Game sessions, answer grading, spaced repetition and per-user settings |
-| `dictionary/` | Merriam-Webster providers for English and Spanish, and their mock versions |
+| `dictionary/` | One provider per language (`en/`, `es/`), the shared Merriam-Webster code (`merriam_webster/`), and the mock providers |
 | `dictionary/fixtures/` | Recorded Merriam-Webster responses used in mock mode |
 | `alembic/` | Database migrations |
 | `tests/` | Unit tests (`tests/unit`) and API tests against real Postgres and Redis (`tests/api`) |
 | `docs/` | Games API documentation and the diagrams |
 | `deploy/`, `Dockerfile`, `docker-entrypoint.sh` | Container image and Cloud Run settings |
 | `.github/workflows/` | CI and the deploy workflow |
-| `create_mocks.py` | Records new fixtures from the real API |
 
 ## Requirements
 

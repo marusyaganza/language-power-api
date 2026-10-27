@@ -193,16 +193,12 @@ async def test_an_unsupported_language_is_rejected_before_the_service(client):
 class _AnoProvider(DictionaryProvider):
     """MW's order for "año": it is searched as "ano", so "ano" comes first."""
 
-    async def fetch(self, query):
+    async def _fetch_raw(self, query):
+        return ["ano", "año", "bisiesto", "Año Nuevo"]
+
+    def _parse(self, raw):
         entry = {"language": "es", "fl": "noun", "stems": [], "defs": ["x"]}
-        return SearchResult(
-            words=[
-                DictionaryEntry(uuid="1", name="ano", **entry),
-                DictionaryEntry(uuid="2", name="año", **entry),
-                DictionaryEntry(uuid="3", name="bisiesto", **entry),
-                DictionaryEntry(uuid="4", name="Año Nuevo", **entry),
-            ]
-        )
+        return SearchResult(words=[DictionaryEntry(uuid=name, name=name, **entry) for name in raw])
 
 
 async def test_search_lists_the_exact_word_first(client, monkeypatch):
@@ -212,8 +208,11 @@ async def test_search_lists_the_exact_word_first(client, monkeypatch):
 
 
 class _BrokenProvider(DictionaryProvider):
-    async def fetch(self, query):
+    async def _fetch_raw(self, query):
         raise DictionaryError("MW answered with status 500")
+
+    def _parse(self, raw):
+        raise AssertionError("never reached")
 
 
 async def test_search_when_the_dictionary_fails_is_a_503(client, monkeypatch):

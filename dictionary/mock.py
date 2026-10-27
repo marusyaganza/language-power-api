@@ -1,8 +1,8 @@
 """Dictionary providers that read saved API responses instead of calling the API.
 
 Used when the `use_mocks` setting is on (see `dictionary.providers`). The
-responses live in `FIXTURES_DIR/<language>/<query>.json` and are recorded by
-`create_mocks.py`.
+responses live in `FIXTURES_DIR/<language>/<query>.json`: each is a real
+provider's `_fetch_raw` answer, saved as it was received.
 """
 
 import json

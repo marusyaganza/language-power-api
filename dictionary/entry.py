@@ -13,7 +13,17 @@ class DictionaryExample:
 
 @dataclass(frozen=True)
 class DictionaryEntry:
-    """One entry of a dictionary response. Saving it is up to the user."""
+    """One entry of a dictionary response. Saving it is up to the user.
+
+    What every provider must fill in, whatever its API calls it:
+
+    * `uuid`: the API's own id for the entry, stable across searches. Saved
+      words are matched to search results by it.
+    * `defs`: meanings in English, whatever the language; the games rely on it.
+    * `fl`: the part of speech, shown as is.
+    * `stems`: forms of the word, used to hide it in hints; may be empty.
+    * `gender`: only for languages with grammatical gender.
+    """
 
     uuid: str
     name: str

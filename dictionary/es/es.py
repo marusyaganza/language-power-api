@@ -1,15 +1,5 @@
-from dictionary.base import DictionaryProvider, SearchResult
-from dictionary.entry import DictionaryEntry, unique_definitions
-from dictionary.helpers.mw import (
-    extract_audio,
-    extract_definitions,
-    extract_examples,
-    extract_gender,
-    fetch_entries,
-    format_entries,
-    format_name,
-    is_suggestion_response,
-)
+from dictionary.merriam_webster.api import extract_gender
+from dictionary.merriam_webster.provider import MerriamWebsterProvider
 from settings import settings
 from words.language import Language
 
@@ -18,50 +8,26 @@ from words.language import Language
 API_URL = "https://www.dictionaryapi.com/api/v3/references/spanish/json"
 
 
-class SpanishDictionaryProvider(DictionaryProvider):
-    async def fetch(self, query: str) -> SearchResult:
-        raw_items = await self._fetch_raw(query)
-        if is_suggestion_response(raw_items):
-            return SearchResult(suggestions=raw_items)
-        return SearchResult(words=format_entries(_spanish_headwords(raw_items), self._format))
+class SpanishDictionaryProvider(MerriamWebsterProvider):
+    language = Language.ES
+    api_url = API_URL
+    audio_country = "me"
 
-    async def _fetch_raw(self, query: str) -> list:
-        return await fetch_entries(API_URL, settings.spanish_api_key.get_secret_value(), query)
+    def _api_key(self) -> str:
+        return settings.spanish_api_key.get_secret_value()
 
-    def _format(self, word):
-        meta = word["meta"]
-        name = format_name(word)
-        language = Language("es")
-        uuid = meta["uuid"]
-        stems = meta["stems"]
-        fl = word.get("fl", "")  # cross-reference entries have none
-        defs = unique_definitions(extract_definitions(word))
-        audio_url = extract_audio(word, language, "me")
-        examples = extract_examples(word)
-        gender = extract_gender(fl)
+    def _keep(self, raw_items: list) -> list:
+        """Drop the English half of the bilingual dictionary.
 
-        return DictionaryEntry(
-            uuid=uuid,
-            name=name,
-            language=language,
-            fl=fl,
-            stems=stems,
-            defs=defs,
-            audio_url=audio_url,
-            examples=examples,
-            gender=gender,
-        )
+        A search for an English word ("dog") returns English entries
+        (`meta.lang` "en") translated into Spanish. They are not Spanish words,
+        and their audio is not under the Spanish path. Entries with an
+        unexpected shape are kept, so `format_entries` still reports them.
+        """
+        return [item for item in raw_items if _headword_language(item) in ("es", None)]
 
-
-def _spanish_headwords(raw_items: list) -> list:
-    """Drop the English half of the bilingual dictionary.
-
-    A search for an English word ("dog") returns English entries
-    (`meta.lang` "en") translated into Spanish. They are not Spanish words,
-    and their audio is not under the Spanish path. Entries with an unexpected
-    shape are kept, so `format_entries` still reports them.
-    """
-    return [item for item in raw_items if _headword_language(item) in ("es", None)]
+    def _extra_fields(self, entry: dict) -> dict:
+        return {"gender": extract_gender(entry.get("fl", ""))}
 
 
 def _headword_language(item) -> str | None:

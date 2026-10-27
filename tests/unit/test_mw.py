@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 from dictionary.base import DictionaryError
-from dictionary.helpers.mw import extract_gender, fetch_entries
+from dictionary.merriam_webster.api import extract_gender, fetch_entries
 
 API_URL = "https://mw-api.invalid/api/v3/references/collegiate/json"
 
