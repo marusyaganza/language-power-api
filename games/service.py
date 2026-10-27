@@ -28,9 +28,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from pydantic import ValidationError
-from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from games import repository
 from games.constants import (
     GAME_ANSWER_TYPES,
     GAME_SETTINGS_PRESETS,
@@ -39,7 +39,7 @@ from games.constants import (
 )
 from games.hints import hidden_definitions
 from games.options import definition_options, word_options
-from games.models import Game, GameLanguage, GameSettings, ReviewLog, WordProgress
+from games.models import Game, GameSettings, ReviewLog, WordProgress
 from games.schemas import (
     GameMode,
     GameOut,
@@ -159,22 +159,11 @@ async def list_games_for_language(
     date among the words that are not due yet (None if there are none).
     `min_word_count` is how many words the game needs before it can start.
     """
-    games = await db.scalars(
-        select(Game)
-        .where(
-            or_(
-                Game.all_languages.is_(True),
-                Game.id.in_(
-                    select(GameLanguage.game_id).where(GameLanguage.language == language)
-                ),
-            )
-        )
-        .order_by(Game.order_num)
-    )
+    games = await repository.get_games_for_language(db, language)
 
     now = datetime.now(UTC)
     result = []
-    for game in games.all():
+    for game in games:
         schedules = await _load_schedules(db, user_id, language, game.game_type)
         upcoming = [s.next_review_date for s in schedules if not s.is_due(now)]
         result.append(
@@ -431,21 +420,7 @@ async def _load_schedules(
     """The schedule of every saved word in `language` that this game type can use."""
     requirements = GAME_TYPE_REQUIREMENTS.get(game_type, {})
     word_ids = await get_word_ids(db, user_id, language, **requirements)
-    if not word_ids:
-        return []
-    # One bound parameter per id; fine for a personal vocabulary, but
-    # Postgres caps a statement at 65535 parameters.
-    rows = await db.execute(
-        select(
-            WordProgress.word_id,
-            WordProgress.next_review_date,
-            WordProgress.last_reviewed_at,
-        ).where(
-            WordProgress.game_type == game_type,
-            WordProgress.word_id.in_(word_ids),
-        )
-    )
-    dates = {row.word_id: (row.next_review_date, row.last_reviewed_at) for row in rows}
+    dates = await repository.get_review_dates(db, game_type, word_ids)
     return [_WordSchedule(word_id, *dates.get(word_id, (None, None))) for word_id in word_ids]
 
 
@@ -654,12 +629,7 @@ async def persist_review_result(
     Nothing is committed on failure; the request's session rolls it back.
     """
     try:
-        progress = await db.scalar(
-            select(WordProgress).where(
-                WordProgress.word_id == word_id,
-                WordProgress.game_type == game_type,
-            )
-        )
+        progress = await repository.get_word_progress(db, word_id, game_type)
         now = datetime.now(UTC)
         if progress is None:
             progress = WordProgress(word_id=word_id, game_type=game_type)

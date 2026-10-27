@@ -29,7 +29,7 @@ Each feature module (`auth`, `words`, `games`) is split the same way:
 
 - **Routers** handle HTTP only: they read the request, pass the logged-in user to a service, and map the service's errors to status codes.
 - **Services** hold the rules, raise domain errors that know nothing about HTTP, and own the transaction: each write ends in a single commit.
-- **Repositories** build the queries and never commit. Words have a separate `repository.py`; the smaller modules keep their few queries in the service.
+- **Repositories** (`repository.py`) build the queries and never commit. Services only call `db.get` for a lookup by primary key. The exception is `users`, whose service is just two one-line lookups.
 
 Some rules hold everywhere:
 

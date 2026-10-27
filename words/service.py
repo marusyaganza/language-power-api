@@ -22,15 +22,13 @@ import logging
 from dataclasses import dataclass
 from math import ceil
 
-from sqlalchemy import Select, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from dictionary.base import DictionaryError, SearchResult
 from dictionary.providers import PROVIDERS
 from words.models import Example, Word
-from words.repository import get_saved_uuids, get_vocabulary
+from words import repository
 from words.schemas import (
     SortOrder,
     VocabularyPage,
@@ -130,7 +128,7 @@ async def search_words(
         return results
 
     uuids = [w.uuid for w in results.words if w.uuid]
-    saved_uuids = await get_saved_uuids(db, user_id, uuids)
+    saved_uuids = await repository.get_saved_uuids(db, user_id, uuids)
     words = [
         WordOut.model_validate(w).model_copy(update={"saved": w.uuid in saved_uuids})
         for w in results.words
@@ -252,7 +250,7 @@ async def get_vocabulary_page(
     `sort_order` defaults to ascending for `name` and descending (newest
     first) for `created_at`.
     """
-    items, total = await get_vocabulary(
+    items, total = await repository.get_vocabulary(
         db,
         user_id,
         language=language,
@@ -286,12 +284,14 @@ async def get_word_ids(
     that field filled in: an audio URL, an image URL, or a grammatical gender.
     Flags that are False do not exclude anything.
     """
-    query = select(Word.id).where(Word.user_id == user_id, Word.language == language)
-    query = _require_fields(
-        query, requires_audio=requires_audio, requires_image=requires_image, requires_gender=requires_gender
+    return await repository.get_word_ids(
+        db,
+        user_id,
+        language,
+        requires_audio=requires_audio,
+        requires_image=requires_image,
+        requires_gender=requires_gender,
     )
-    result = await db.scalars(query)
-    return list(result.all())
 
 
 @dataclass(frozen=True)
@@ -313,12 +313,7 @@ async def get_word_summaries(
     when many words are compared and few are shown. Ids that do not exist or
     belong to another user are skipped.
     """
-    if not word_ids:
-        return []
-    rows = await db.execute(
-        select(Word.id, Word.name, Word.stems, Word.defs)
-        .where(Word.user_id == user_id, Word.id.in_(word_ids))
-    )
+    rows = await repository.get_word_summary_rows(db, user_id, word_ids)
     return [WordSummary(*row) for row in rows]
 
 
@@ -327,14 +322,7 @@ async def get_words_by_ids(db: AsyncSession, user_id: int, word_ids: list[int]) 
 
     Ids that do not exist or belong to another user are skipped.
     """
-    if not word_ids:
-        return []
-    result = await db.scalars(
-        select(Word)
-        .options(selectinload(Word.examples))
-        .where(Word.user_id == user_id, Word.id.in_(word_ids))
-    )
-    return list(result.all())
+    return await repository.get_words_by_ids(db, user_id, word_ids)
 
 
 # --------------------------------------------------------------------------- #
@@ -347,11 +335,7 @@ async def _get_owned_word(db: AsyncSession, user_id: int, word_id: int) -> Word:
     Raises:
         WordNotFoundError: no such word, or it belongs to another user.
     """
-    word = await db.scalar(
-        select(Word)
-        .options(selectinload(Word.examples))
-        .where(Word.id == word_id, Word.user_id == user_id)
-    )
+    word = await repository.get_word(db, user_id, word_id)
     if word is None:
         raise WordNotFoundError("Word not found")
     return word
@@ -361,15 +345,3 @@ def _to_examples(items) -> list[Example]:
     """Build new `Example` rows from schema objects with `text` and `translation`."""
     return [Example(text=e.text, translation=e.translation) for e in items]
 
-
-def _require_fields(
-    query: Select, *, requires_audio: bool, requires_image: bool, requires_gender: bool
-) -> Select:
-    """Narrow a query on `Word` to rows where each requested field is set."""
-    if requires_audio:
-        query = query.where(Word.audio_url.is_not(None))
-    if requires_image:
-        query = query.where(Word.img_url.is_not(None))
-    if requires_gender:
-        query = query.where(Word.gender.is_not(None))
-    return query
