@@ -161,15 +161,15 @@ async def test_vocabulary_search_sort_and_pages(client):
 
 
 async def test_search_marks_saved_words(client):
-    results = (await client.get("/words/search", params={"query": "ser", "language": "es"})).json()
+    results = (await client.get("/words/search", params={"query": "vivir", "language": "es"})).json()
     entries = results["words"]
-    assert {w["name"] for w in entries} >= {"ser"}
+    assert {w["name"] for w in entries} >= {"vivir"}
     assert not any(w["saved"] for w in entries)
 
     first = entries[0]
     await save_word(client, first["name"], uuid=first["uuid"], defs=first["defs"])
 
-    again = (await client.get("/words/search", params={"query": "ser", "language": "es"})).json()
+    again = (await client.get("/words/search", params={"query": "vivir", "language": "es"})).json()
     saved = {w["uuid"]: w["saved"] for w in again["words"]}
     assert saved.pop(first["uuid"]) is True
     assert not any(saved.values())
