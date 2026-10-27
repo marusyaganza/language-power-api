@@ -20,6 +20,7 @@ Rules that apply to every function below:
 """
 
 import logging
+import unicodedata
 from dataclasses import dataclass
 from math import ceil
 
@@ -100,7 +101,9 @@ class WordAlreadySavedError(WordsError):
 async def search_words(db: AsyncSession, user_id: int, *, query: str, language: str) -> SearchResult:
     """Look `query` up in the dictionary for `language`.
 
-    Each returned word has `saved=True` if the user already has a saved word
+    Words named exactly `query` come first, the rest in the dictionary's
+    order: MW is searched without accents, so "año" would otherwise follow
+    "ano". Each returned word has `saved=True` if the user already has a saved word
     with the same dictionary uuid. Words the dictionary returns without a uuid
     are never marked as saved.
 
@@ -131,6 +134,8 @@ async def search_words(db: AsyncSession, user_id: int, *, query: str, language: 
     uuids = [w.uuid for w in results.words if w.uuid]
     saved_uuids = await repository.get_saved_uuids(db, user_id, uuids)
     words = [WordOut.model_validate(w).model_copy(update={"saved": w.uuid in saved_uuids}) for w in results.words]
+    searched = _comparable(query)
+    words.sort(key=lambda w: _comparable(w.name) != searched)  # stable: ties keep their order
     return SearchResult(words=words)
 
 
@@ -341,3 +346,8 @@ async def _get_owned_word(db: AsyncSession, user_id: int, word_id: int) -> Word:
 def _to_examples(items) -> list[Example]:
     """Build new `Example` rows from schema objects with `text` and `translation`."""
     return [Example(text=e.text, translation=e.translation) for e in items]
+
+
+def _comparable(text: str) -> str:
+    """`text` as a user would read it: "Año", "año" and "an" + combining tilde + "o" are equal."""
+    return unicodedata.normalize("NFC", text).strip().casefold()

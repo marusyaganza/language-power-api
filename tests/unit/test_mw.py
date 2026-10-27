@@ -65,6 +65,11 @@ def requests(serve):
         ("a?key=other", "a%3Fkey%3Dother"),
         ("../thesaurus/v3/references/x", "..%2Fthesaurus%2Fv3%2Freferences%2Fx"),
         ("ice cream", "ice%20cream"),
+        # Regression: MW answers accented queries with suggestions only.
+        ("cariño", "carino"),
+        ("jamás", "jamas"),
+        ("pingüino", "pinguino"),
+        ("carin\u0303o", "carino"),  # "n" + a combining tilde
     ],
 )
 def test_query_is_one_encoded_path_segment(requests, query, segment):

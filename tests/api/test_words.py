@@ -1,7 +1,8 @@
 # tests/api/test_words.py
 import pytest
 
-from dictionary.base import DictionaryError, DictionaryProvider
+from dictionary.base import DictionaryError, DictionaryProvider, SearchResult
+from dictionary.entry import DictionaryEntry
 from dictionary.providers import PROVIDERS
 from tests.api.conftest import save_word, signup
 
@@ -187,6 +188,27 @@ async def test_an_unsupported_language_is_rejected_before_the_service(client):
     vocabulary = await client.get("/words/vocabulary", params={"language": "xx"})
     save = await client.post("/words/save", json={"name": "x", "language": "xx", "fl": "noun", "defs": ["x"]})
     assert [search.status_code, vocabulary.status_code, save.status_code] == [422, 422, 422]
+
+
+class _AnoProvider(DictionaryProvider):
+    """MW's order for "año": it is searched as "ano", so "ano" comes first."""
+
+    async def fetch(self, query):
+        entry = {"language": "es", "fl": "noun", "stems": [], "defs": ["x"]}
+        return SearchResult(
+            words=[
+                DictionaryEntry(uuid="1", name="ano", **entry),
+                DictionaryEntry(uuid="2", name="año", **entry),
+                DictionaryEntry(uuid="3", name="bisiesto", **entry),
+                DictionaryEntry(uuid="4", name="Año Nuevo", **entry),
+            ]
+        )
+
+
+async def test_search_lists_the_exact_word_first(client, monkeypatch):
+    monkeypatch.setitem(PROVIDERS, "es", _AnoProvider())
+    response = await client.get("/words/search", params={"query": "Año", "language": "es"})
+    assert [w["name"] for w in response.json()["words"]] == ["año", "ano", "bisiesto", "Año Nuevo"]
 
 
 class _BrokenProvider(DictionaryProvider):

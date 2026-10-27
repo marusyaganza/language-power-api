@@ -1,5 +1,6 @@
 import logging
 import re
+import unicodedata
 from collections.abc import Callable
 from urllib.parse import quote
 
@@ -29,6 +30,11 @@ async def fetch_entries(api_url: str, api_key: str, query: str) -> list:
     "." or ".." in the path, and nothing else is a word, so it returns no
     entries without a request.
 
+    Accents and tildes are removed first ("cariño" -> "carino"): MW looks
+    words up by unaccented ids and answers an accented query with suggestions
+    only, the first being the query itself. The entries still carry their
+    accented headwords.
+
     MW answers an unknown word with an empty list or spelling suggestions,
     so anything other than a JSON list is a failure. A bad key, for example,
     comes back as plain text.
@@ -39,6 +45,7 @@ async def fetch_entries(api_url: str, api_key: str, query: str) -> list:
             names only the kind of failure: httpx's own messages include the
             URL, and the URL includes the API key.
     """
+    query = _without_accents(query)
     if not query.strip("."):
         return []
     try:
@@ -55,6 +62,11 @@ async def fetch_entries(api_url: str, api_key: str, query: str) -> list:
     if not isinstance(data, list):
         raise DictionaryError(f"MW answered with a JSON {type(data).__name__}, not a list")
     return data
+
+
+def _without_accents(text: str) -> str:
+    decomposed = unicodedata.normalize("NFD", text)
+    return unicodedata.normalize("NFC", "".join(c for c in decomposed if not unicodedata.combining(c)))
 
 
 def format_entries(raw_items: list, format_entry: Callable[[dict], DictionaryEntry]) -> list[DictionaryEntry]:
