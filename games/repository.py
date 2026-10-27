@@ -1,4 +1,5 @@
 """Queries on the games tables. Never commits; callers own the transaction."""
+
 from datetime import datetime
 
 from sqlalchemy import or_, select
@@ -14,9 +15,7 @@ async def get_games_for_language(db: AsyncSession, language: str) -> list[Game]:
         .where(
             or_(
                 Game.all_languages.is_(True),
-                Game.id.in_(
-                    select(GameLanguage.game_id).where(GameLanguage.language == language)
-                ),
+                Game.id.in_(select(GameLanguage.game_id).where(GameLanguage.language == language)),
             )
         )
         .order_by(Game.order_num)

@@ -1,5 +1,6 @@
 # tests/api/test_proxy_signature.py
 """Only requests signed by the frontend's Netlify proxy reach the API (core.proxy_signature)."""
+
 import time
 
 import jwt

@@ -20,6 +20,7 @@ option below closes a specific leak:
 * Netlify adds headers with the proxy signature, the client's IP and its
   location: only the headers in `_KEPT_HEADERS` are sent (`scrub_event`).
 """
+
 from typing import Any
 
 import sentry_sdk
@@ -40,9 +41,7 @@ def scrub_event(event: dict[str, Any], hint: dict[str, Any]) -> dict[str, Any]:
     request = event.get("request")
     if isinstance(request, dict) and isinstance(request.get("headers"), dict):
         request["headers"] = {
-            name: value
-            for name, value in request["headers"].items()
-            if name.lower() in _KEPT_HEADERS
+            name: value for name, value in request["headers"].items() if name.lower() in _KEPT_HEADERS
         }
     return event
 

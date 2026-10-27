@@ -15,6 +15,7 @@ def word_create(**fields):
 # Words
 # --------------------------------------------------------------------------- #
 
+
 @pytest.mark.parametrize("translation", [None, "", "   "])
 def test_example_translation_can_be_missing(translation):
     # Regression: PATCH /words/{id} rejected null translations with a 422.
@@ -54,6 +55,7 @@ def test_unknown_gender_is_rejected():
 # Game settings
 # --------------------------------------------------------------------------- #
 
+
 def settings(**fields):
     return GameSettingsUpdate(
         **{"learning_steps_minutes": [15, 1440], "graduating_interval_days": 6, "strict_mode": False, **fields}
@@ -67,12 +69,12 @@ def test_valid_settings():
 @pytest.mark.parametrize(
     "fields",
     [
-        {"learning_steps_minutes": []},                         # at least one step
-        {"learning_steps_minutes": [1, 2, 3, 4, 5, 6]},         # at most five
-        {"learning_steps_minutes": [15, 15]},                   # must get longer
+        {"learning_steps_minutes": []},  # at least one step
+        {"learning_steps_minutes": [1, 2, 3, 4, 5, 6]},  # at most five
+        {"learning_steps_minutes": [15, 15]},  # must get longer
         {"learning_steps_minutes": [60, 15]},
-        {"learning_steps_minutes": [0, 15]},                    # at least a minute
-        {"learning_steps_minutes": [15, 91 * 24 * 60]},         # at most 90 days
+        {"learning_steps_minutes": [0, 15]},  # at least a minute
+        {"learning_steps_minutes": [15, 91 * 24 * 60]},  # at most 90 days
         {"graduating_interval_days": 0},
         {"graduating_interval_days": 91},
         # Graduating (1 day) would come sooner than the last step (2 days).
@@ -87,6 +89,7 @@ def test_invalid_settings_are_rejected(fields):
 # --------------------------------------------------------------------------- #
 # Auth
 # --------------------------------------------------------------------------- #
+
 
 @pytest.mark.parametrize("schema", [UserCreate, LoginRequest])
 def test_password_up_to_72_bytes_is_accepted(schema):
@@ -121,4 +124,3 @@ def test_login_has_no_minimum_password_length():
 def test_email_is_trimmed_and_lowercased(schema):
     user = schema(email="  Foo.Bar@Example.COM ", password="a" * 8)
     assert user.email == "foo.bar@example.com"
-

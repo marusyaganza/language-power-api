@@ -1,5 +1,7 @@
 from fastapi import Response
+
 from settings import settings
+
 
 def set_session_cookie(response: Response, session_id: str) -> None:
     response.set_cookie(

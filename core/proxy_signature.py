@@ -9,6 +9,7 @@ call to the Cloud Run URL, and is rejected.
 The check is off while `settings.proxy_signature_secret` is unset, as in local
 development (the Vite dev proxy doesn't sign) and in tests.
 """
+
 import jwt
 from fastapi import HTTPException, Request, status
 

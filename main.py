@@ -1,12 +1,13 @@
 from fastapi import Depends, FastAPI
-from words.router import router as words_router
-from auth.router import auth_router
-from games.router import router as games_router, settings_router as game_settings_router
 from fastapi.middleware.cors import CORSMiddleware
 
+from auth.router import auth_router
 from core.proxy_signature import require_proxy_signature
 from core.sentry import init_sentry
+from games.router import router as games_router
+from games.router import settings_router as game_settings_router
 from settings import settings
+from words.router import router as words_router
 
 # Before the app is created, so Sentry's FastAPI integration sees all of it.
 init_sentry(settings)

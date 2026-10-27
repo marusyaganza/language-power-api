@@ -5,6 +5,7 @@ heart thought of as the place where emotions are felt"). Before a definition
 is shown as a clue or an option, every form of its word (the name and the
 dictionary stems, e.g. "hearts", "by heart") is replaced with `BLANK`.
 """
+
 import re
 
 BLANK = "___"

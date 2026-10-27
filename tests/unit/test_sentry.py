@@ -31,14 +31,18 @@ def test_an_empty_release_is_no_release():
 
 
 def test_only_harmless_request_headers_are_kept():
-    event = {"request": {"headers": {
-        "User-Agent": "Mozilla/5.0",
-        "content-type": "application/json",
-        "x-nf-sign": "a.signed.token",
-        "x-nf-client-connection-ip": "203.0.113.7",
-        "x-nf-geo": "eyJjaXR5Ijoi...",
-        "Cookie": "session_id=secret",
-    }}}
+    event = {
+        "request": {
+            "headers": {
+                "User-Agent": "Mozilla/5.0",
+                "content-type": "application/json",
+                "x-nf-sign": "a.signed.token",
+                "x-nf-client-connection-ip": "203.0.113.7",
+                "x-nf-geo": "eyJjaXR5Ijoi...",
+                "Cookie": "session_id=secret",
+            }
+        }
+    }
     assert scrub_event(event, {})["request"]["headers"] == {
         "User-Agent": "Mozilla/5.0",
         "content-type": "application/json",
@@ -51,11 +55,14 @@ def test_an_event_without_a_request_is_unchanged():
 
 
 def test_the_query_string_of_an_outgoing_request_is_dropped():
-    crumb = {"category": "httplib", "data": {
-        "url": "https://www.dictionaryapi.com/api/v3/references/spanish/json/casa",
-        "http.query": "key=the-mw-key",
-        "http.method": "GET",
-    }}
+    crumb = {
+        "category": "httplib",
+        "data": {
+            "url": "https://www.dictionaryapi.com/api/v3/references/spanish/json/casa",
+            "http.query": "key=the-mw-key",
+            "http.method": "GET",
+        },
+    }
     assert scrub_breadcrumb(crumb, {})["data"] == {
         "url": "https://www.dictionaryapi.com/api/v3/references/spanish/json/casa",
         "http.method": "GET",

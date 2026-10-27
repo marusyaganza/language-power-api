@@ -18,6 +18,7 @@ Rules that apply to every function below:
 * Nothing here knows about games. Filters are phrased in terms of what a word
   has (audio, image, gender), and callers decide which of those they need.
 """
+
 import logging
 from dataclasses import dataclass
 from math import ceil
@@ -27,8 +28,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dictionary.base import DictionaryError, SearchResult
 from dictionary.providers import PROVIDERS
-from words.models import Example, Word
 from words import repository
+from words.models import Example, Word
 from words.schemas import (
     SortOrder,
     VocabularyPage,
@@ -66,6 +67,7 @@ VOCABULARY_PAGE_SIZE = 10
 # Errors
 # --------------------------------------------------------------------------- #
 
+
 class WordsError(Exception):
     """Base class for every error this module raises on purpose."""
 
@@ -94,9 +96,8 @@ class WordAlreadySavedError(WordsError):
 # Dictionary search
 # --------------------------------------------------------------------------- #
 
-async def search_words(
-    db: AsyncSession, user_id: int, *, query: str, language: str
-) -> SearchResult:
+
+async def search_words(db: AsyncSession, user_id: int, *, query: str, language: str) -> SearchResult:
     """Look `query` up in the dictionary for `language`.
 
     Each returned word has `saved=True` if the user already has a saved word
@@ -129,16 +130,14 @@ async def search_words(
 
     uuids = [w.uuid for w in results.words if w.uuid]
     saved_uuids = await repository.get_saved_uuids(db, user_id, uuids)
-    words = [
-        WordOut.model_validate(w).model_copy(update={"saved": w.uuid in saved_uuids})
-        for w in results.words
-    ]
+    words = [WordOut.model_validate(w).model_copy(update={"saved": w.uuid in saved_uuids}) for w in results.words]
     return SearchResult(words=words)
 
 
 # --------------------------------------------------------------------------- #
 # Saved vocabulary: writes
 # --------------------------------------------------------------------------- #
+
 
 async def save_word(db: AsyncSession, user_id: int, payload: WordCreate) -> Word:
     """Add `payload` to the user's vocabulary and return the stored word.
@@ -175,9 +174,7 @@ async def save_word(db: AsyncSession, user_id: int, payload: WordCreate) -> Word
     return word
 
 
-async def update_word(
-    db: AsyncSession, user_id: int, word_id: int, payload: WordUpdate
-) -> Word:
+async def update_word(db: AsyncSession, user_id: int, word_id: int, payload: WordUpdate) -> Word:
     """Apply a partial edit to one of the user's saved words.
 
     Only `defs`, `audio_url`, `img_url`, `img_desc` and `examples` can be
@@ -229,6 +226,7 @@ async def delete_word(db: AsyncSession, user_id: int, word_id: int) -> None:
 # --------------------------------------------------------------------------- #
 # Saved vocabulary: reads
 # --------------------------------------------------------------------------- #
+
 
 async def get_vocabulary_page(
     db: AsyncSession,
@@ -304,9 +302,7 @@ class WordSummary:
     defs: list[str]
 
 
-async def get_word_summaries(
-    db: AsyncSession, user_id: int, word_ids: list[int]
-) -> list[WordSummary]:
+async def get_word_summaries(db: AsyncSession, user_id: int, word_ids: list[int]) -> list[WordSummary]:
     """Summaries of the user's saved words with these ids, in no particular order.
 
     Much lighter than `get_words_by_ids`: four columns and no examples, for
@@ -329,6 +325,7 @@ async def get_words_by_ids(db: AsyncSession, user_id: int, word_ids: list[int]) 
 # Internals
 # --------------------------------------------------------------------------- #
 
+
 async def _get_owned_word(db: AsyncSession, user_id: int, word_id: int) -> Word:
     """Load a saved word together with its examples.
 
@@ -344,4 +341,3 @@ async def _get_owned_word(db: AsyncSession, user_id: int, word_id: int) -> Word:
 def _to_examples(items) -> list[Example]:
     """Build new `Example` rows from schema objects with `text` and `translation`."""
     return [Example(text=e.text, translation=e.translation) for e in items]
-

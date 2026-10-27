@@ -1,4 +1,5 @@
 """FastAPI dependencies for identifying the caller."""
+
 from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -5,7 +5,7 @@ from enum import Enum
 
 class AnswerGrade(str, Enum):
     WRONG = "wrong"
-    CLOSE = "close"      # a near-miss: a typo, or half of a "both" gender
+    CLOSE = "close"  # a near-miss: a typo, or half of a "both" gender
     CORRECT = "correct"
 
 

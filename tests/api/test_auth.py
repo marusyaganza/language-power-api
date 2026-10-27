@@ -3,12 +3,12 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 import auth.service
-from settings import settings
 from auth.rate_limit import AttemptLimiter
 from auth.schemas import UserCreate
+from settings import settings
+from tests.api.conftest import PASSWORD, signup
 from users import service as users_service
 from users.models import User
-from tests.api.conftest import PASSWORD, signup
 
 pytestmark = pytest.mark.anyio
 
@@ -40,22 +40,16 @@ async def test_login_checks_the_password(make_client):
 
 
 async def test_unknown_email_gets_the_same_error_as_a_wrong_password(make_client):
-    response = await make_client().post(
-        "/auth/login", json={"email": "nobody@example.com", "password": PASSWORD}
-    )
+    response = await make_client().post("/auth/login", json={"email": "nobody@example.com", "password": PASSWORD})
     assert response.status_code == 401
 
 
 async def test_password_too_long_for_bcrypt_is_a_422_not_a_500(make_client):
     client = make_client()
     long_password = "a" * 73
-    signup_response = await client.post(
-        "/auth/signup", json={"email": "long@example.com", "password": long_password}
-    )
+    signup_response = await client.post("/auth/signup", json={"email": "long@example.com", "password": long_password})
     assert signup_response.status_code == 422
-    login_response = await client.post(
-        "/auth/login", json={"email": "long@example.com", "password": long_password}
-    )
+    login_response = await client.post("/auth/login", json={"email": "long@example.com", "password": long_password})
     assert login_response.status_code == 422
 
 
@@ -79,9 +73,7 @@ async def test_email_case_does_not_matter(make_client):
 
 
 async def test_signup_password_shorter_than_8_characters_is_a_422(make_client):
-    response = await make_client().post(
-        "/auth/signup", json={"email": "short@example.com", "password": "a" * 7}
-    )
+    response = await make_client().post("/auth/signup", json={"email": "short@example.com", "password": "a" * 7})
     assert response.status_code == 422
 
 
@@ -94,9 +86,7 @@ async def test_database_rejects_an_uppercase_email(db):
 
 async def test_signup_can_be_closed(make_client, monkeypatch):
     monkeypatch.setattr(settings, "signup_enabled", False)
-    response = await make_client().post(
-        "/auth/signup", json={"email": "closed@example.com", "password": PASSWORD}
-    )
+    response = await make_client().post("/auth/signup", json={"email": "closed@example.com", "password": PASSWORD})
     assert response.status_code == 403
     assert (await make_client().get("/auth/config")).json()["signup_enabled"] is False
 
@@ -118,9 +108,7 @@ async def test_signup_race_for_one_email_is_a_409_not_a_500(make_client, monkeyp
         return None
 
     monkeypatch.setattr(users_service, "get_user_by_email", nobody_has_it)
-    second = await make_client().post(
-        "/auth/signup", json={"email": user["email"], "password": PASSWORD}
-    )
+    second = await make_client().post("/auth/signup", json={"email": user["email"], "password": PASSWORD})
     assert second.status_code == 409
     assert second.json() == {"detail": "Email already registered"}
     assert (await first.get("/auth/me")).json()["id"] == user["id"]
@@ -137,14 +125,13 @@ async def test_create_user_keeps_other_database_errors(db):
     # model_construct skips validation, so the uppercase email reaches the
     # database and breaks ck_users_email_lowercase instead.
     with pytest.raises(IntegrityError):
-        await users_service.create_user(
-            db, UserCreate.model_construct(email="Upper@example.com", password=PASSWORD)
-        )
+        await users_service.create_user(db, UserCreate.model_construct(email="Upper@example.com", password=PASSWORD))
 
 
 # --------------------------------------------------------------------------- #
 # Rate limits
 # --------------------------------------------------------------------------- #
+
 
 async def login(client, email, password):
     return await client.post("/auth/login", json={"email": email, "password": password})
@@ -200,9 +187,7 @@ async def test_signups_are_limited_across_everyone(make_client, monkeypatch):
     await signup(make_client())
     await signup(make_client())
 
-    response = await make_client().post(
-        "/auth/signup", json={"email": "third@example.com", "password": PASSWORD}
-    )
+    response = await make_client().post("/auth/signup", json={"email": "third@example.com", "password": PASSWORD})
     assert response.status_code == 429
     assert int(response.headers["retry-after"]) > 0
 
@@ -210,9 +195,7 @@ async def test_signups_are_limited_across_everyone(make_client, monkeypatch):
 async def test_closed_signups_do_not_use_up_the_signup_limit(make_client, monkeypatch):
     monkeypatch.setattr(auth.service, "_signup_limiter", AttemptLimiter(1, 3600))
     monkeypatch.setattr(settings, "signup_enabled", False)
-    closed = await make_client().post(
-        "/auth/signup", json={"email": "closed@example.com", "password": PASSWORD}
-    )
+    closed = await make_client().post("/auth/signup", json={"email": "closed@example.com", "password": PASSWORD})
     assert closed.status_code == 403
 
     monkeypatch.setattr(settings, "signup_enabled", True)

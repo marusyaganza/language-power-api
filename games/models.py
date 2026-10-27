@@ -45,9 +45,7 @@ class GameLanguage(Base):
 
 class WordProgress(Base):
     __tablename__ = "word_progress"
-    __table_args__ = (
-        UniqueConstraint("word_id", "game_type", name="uq_word_progress_word_game"),
-    )
+    __table_args__ = (UniqueConstraint("word_id", "game_type", name="uq_word_progress_word_game"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     word_id: Mapped[int] = mapped_column(ForeignKey("words.id", ondelete="CASCADE"), index=True)

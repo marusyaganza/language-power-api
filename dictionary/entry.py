@@ -1,4 +1,5 @@
 """What a dictionary lookup returns, whichever dictionary answered it."""
+
 from dataclasses import dataclass, field
 
 from words.language import Language

@@ -52,9 +52,7 @@ API_CONFIG = {
 CONCURRENCY_LIMIT = 5
 
 
-async def fetch_word(
-    client: httpx.AsyncClient, semaphore: asyncio.Semaphore, language: str, word: str
-) -> None:
+async def fetch_word(client: httpx.AsyncClient, semaphore: asyncio.Semaphore, language: str, word: str) -> None:
     config = API_CONFIG[language]
     url = f"{config['url']}/{word}?key={config['key']}"  # <-- adjust if your API expects a query param instead
 
@@ -75,20 +73,14 @@ async def fetch_word(
     out_path = out_dir / f"{word}.json"
 
     # ensure_ascii=False so Spanish accented characters stay readable, not \uXXXX escaped
-    out_path.write_text(
-        json.dumps(response.json(), indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    out_path.write_text(json.dumps(response.json(), indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"saved   {language}/{word} -> {out_path}")
 
 
 async def main() -> None:
     semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
     async with httpx.AsyncClient() as client:
-        tasks = [
-            fetch_word(client, semaphore, language, word)
-            for language, words in WORDS.items()
-            for word in words
-        ]
+        tasks = [fetch_word(client, semaphore, language, word) for language, words in WORDS.items() for word in words]
         await asyncio.gather(*tasks)
 
 

@@ -5,17 +5,16 @@ Revises: a585950f8bff
 Create Date: 2026-10-17 19:55:48.488191
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
 
 from alembic import op
-import sqlalchemy as sa
-
 
 # revision identifiers, used by Alembic.
-revision: str = 'a974a89d47e4'
-down_revision: Union[str, Sequence[str], None] = 'a585950f8bff'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "a974a89d47e4"
+down_revision: str | Sequence[str] | None = "a585950f8bff"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 # Same rule as dictionary.helpers.mw.extract_gender. Words whose part of
@@ -33,12 +32,8 @@ _GENDER_FROM_FL = """
 
 def upgrade() -> None:
     """Re-derive gender ("masculine or feminine" nouns became "feminine") and restrict its values."""
-    op.execute(
-        f"UPDATE words SET gender = {_GENDER_FROM_FL} WHERE gender IS DISTINCT FROM {_GENDER_FROM_FL}"
-    )
-    op.create_check_constraint(
-        "ck_words_gender", "words", "gender IN ('masculine', 'feminine', 'both')"
-    )
+    op.execute(f"UPDATE words SET gender = {_GENDER_FROM_FL} WHERE gender IS DISTINCT FROM {_GENDER_FROM_FL}")
+    op.create_check_constraint("ck_words_gender", "words", "gender IN ('masculine', 'feminine', 'both')")
 
 
 def downgrade() -> None:

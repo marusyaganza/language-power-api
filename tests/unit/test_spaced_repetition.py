@@ -57,6 +57,7 @@ def test_initialize_progress_starts_learning_now():
 # Learning
 # --------------------------------------------------------------------------- #
 
+
 @pytest.mark.parametrize("step_index", [0, 1])
 def test_learning_correct_advances_one_step(step_index):
     state, delay = update(learning(step_index), CORRECT)
@@ -116,6 +117,7 @@ def test_graduating_interval_is_never_shorter_than_last_step():
 # --------------------------------------------------------------------------- #
 # Graduated
 # --------------------------------------------------------------------------- #
+
 
 def test_graduated_correct_doubles_interval():
     state, delay = update(graduated(interval_days=6.0, consecutive_correct=3), CORRECT)

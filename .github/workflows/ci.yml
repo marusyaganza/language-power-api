@@ -1,4 +1,4 @@
-# Unit and API tests, against real Postgres and Redis containers.
+# Lint, then unit and API tests against real Postgres and Redis containers.
 # Runs on every push and pull request, and as the first job of deploy.yml.
 name: CI
 
@@ -59,6 +59,12 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
+
+      # Settings in pyproject.toml. Fails on lint errors or unformatted code.
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
 
       # tests/conftest.py sets every setting itself (mock dictionaries, the test
       # database, Redis database 15), so no .env or secrets are needed here.

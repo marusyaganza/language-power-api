@@ -10,6 +10,7 @@
 * Redis: `settings.redis_url`, which tests/conftest.py points at database 15.
   It is flushed after each test, so dev keys are never touched.
 """
+
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -49,13 +50,10 @@ def _migrated_database():
 
     admin_url = url.set(drivername="postgresql", database="postgres")
     try:
-        conn = psycopg.connect(
-            admin_url.render_as_string(hide_password=False), autocommit=True, connect_timeout=5
-        )
+        conn = psycopg.connect(admin_url.render_as_string(hide_password=False), autocommit=True, connect_timeout=5)
     except psycopg.OperationalError as exc:
         pytest.fail(
-            f"Postgres is not reachable at {url.host}:{url.port} "
-            f"(start it with `docker compose up -d`): {exc}",
+            f"Postgres is not reachable at {url.host}:{url.port} (start it with `docker compose up -d`): {exc}",
             pytrace=False,
         )
     with conn:
@@ -105,12 +103,14 @@ async def make_client(db, redis, monkeypatch):
     """
     monkeypatch.setattr(settings, "signup_enabled", True)
     # Fresh rate limits for every test (the app's are shared by the process).
-    monkeypatch.setattr(auth.service, "_login_limiter", AttemptLimiter(
-        settings.login_attempt_limit, settings.login_attempt_window_seconds
-    ))
-    monkeypatch.setattr(auth.service, "_signup_limiter", AttemptLimiter(
-        settings.signup_limit, settings.signup_window_seconds
-    ))
+    monkeypatch.setattr(
+        auth.service,
+        "_login_limiter",
+        AttemptLimiter(settings.login_attempt_limit, settings.login_attempt_window_seconds),
+    )
+    monkeypatch.setattr(
+        auth.service, "_signup_limiter", AttemptLimiter(settings.signup_limit, settings.signup_window_seconds)
+    )
 
     async def _get_db():
         yield db
@@ -119,9 +119,7 @@ async def make_client(db, redis, monkeypatch):
     clients = []
 
     def _make() -> httpx.AsyncClient:
-        client = httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        )
+        client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
         clients.append(client)
         return client
 

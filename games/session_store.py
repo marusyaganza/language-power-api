@@ -21,6 +21,7 @@ Updates are read-modify-write, so two simultaneous answers to the same session
 can overwrite each other's "answered" flag. A single player is not expected to
 do that.
 """
+
 import json
 import uuid
 
@@ -38,9 +39,7 @@ def _game_session_key(session_id: str) -> str:
     return f"game_session:{session_id}"
 
 
-async def create_game_session(
-    user_id: int, game_id: int, game_type: str, questions: list[dict]
-) -> str:
+async def create_game_session(user_id: int, game_id: int, game_type: str, questions: list[dict]) -> str:
     """Store a new session for `user_id` and return its id."""
     session_id = str(uuid.uuid4())
     session_data = {
@@ -85,9 +84,7 @@ def is_answered(question: dict) -> bool:
     return "grade" in question
 
 
-async def mark_question_answered(
-    session_id: str, session_data: dict, word_id: int, grade: str
-) -> bool:
+async def mark_question_answered(session_id: str, session_data: dict, word_id: int, grade: str) -> bool:
     """Record `grade` for the question and return True if every question is now answered.
 
     `session_data` is updated in place and saved back to Redis. Answering the

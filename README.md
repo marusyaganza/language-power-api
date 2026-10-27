@@ -47,7 +47,7 @@ Some rules hold everywhere:
 - Redis 7 for auth sessions and game sessions
 - httpx for the Merriam-Webster API
 - bcrypt for password hashing
-- pytest and pytest-cov
+- pytest and pytest-cov, ruff
 - Docker, GitHub Actions and Google Cloud Run
 
 ## Project structure
@@ -165,7 +165,16 @@ pytest --cov           # with a coverage report (configured in .coveragerc)
 - **API tests** call the app over HTTP and need PostgreSQL and Redis from `docker compose up -d`. They create a separate `language_app_test` database and run every migration on it, so the migrations are tested too. Each test runs in a transaction that is rolled back afterwards, and Redis database 15 is flushed after each test, so the development data is never touched.
 - Tests always use the mock dictionaries, whatever `.env` says, and need no API keys.
 
-CI runs the whole suite against PostgreSQL and Redis containers on every push and pull request. No linter or type checker is configured yet.
+Linting and formatting use [ruff](https://docs.astral.sh/ruff/), configured in `pyproject.toml`:
+
+```bash
+ruff check .           # lint
+ruff format .          # format
+```
+
+New migrations are linted and formatted by ruff as Alembic writes them.
+
+CI runs ruff and then the whole suite against PostgreSQL and Redis containers on every push and pull request. No type checker is configured yet.
 
 ## API overview
 
@@ -191,7 +200,7 @@ The API is built for the Language Power frontend only. [docs/games.md](docs/game
 The browser only ever talks to the Netlify origin, so the session cookie stays first-party (`SameSite=Lax`) and the API needs no CORS in production. Running a single instance keeps migrations on startup safe.
 
 - The `Dockerfile` builds a slim Python 3.12 image that runs as a non-root user. On start, `docker-entrypoint.sh` applies the migrations, syncs the games and starts Uvicorn.
-- `.github/workflows/ci.yml` runs the tests on every push and pull request.
+- `.github/workflows/ci.yml` runs ruff and the tests on every push and pull request.
 - `.github/workflows/deploy.yml` is started by hand. It runs the tests, builds and pushes the image, deploys it to Cloud Run, and checks that the new revision answers. GitHub authenticates to Google Cloud through Workload Identity Federation, so no service account key is stored anywhere.
 
 ## Related projects

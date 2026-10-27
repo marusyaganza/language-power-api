@@ -1,9 +1,10 @@
 """HTTP interface for the games module.
 
 Handlers only translate between HTTP and `games.service`: they read the
-request, pass in the acting user, and map service errors to status codes. What each operation does is documented on the service
-functions.
+request, pass in the acting user, and map service errors to status codes.
+What each operation does is documented on the service functions.
 """
+
 from contextlib import contextmanager
 
 from fastapi import (

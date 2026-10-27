@@ -1,5 +1,6 @@
 # tests/unit/test_options.py
 """The options are shuffled, so these tests check properties, not positions."""
+
 from types import SimpleNamespace
 
 from games.hints import BLANK
@@ -22,6 +23,7 @@ POOL = [
 # --------------------------------------------------------------------------- #
 # select_def: pick the definition
 # --------------------------------------------------------------------------- #
+
 
 def test_definition_options_include_the_answer_once():
     target = POOL[0]
@@ -70,6 +72,7 @@ def test_definition_options_skip_meanings_of_other_entries_with_the_same_name():
 # --------------------------------------------------------------------------- #
 # select_word: pick the word
 # --------------------------------------------------------------------------- #
+
 
 def test_word_options_include_the_answer_once():
     options = word_options(POOL[0], POOL, 4)

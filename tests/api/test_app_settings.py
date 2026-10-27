@@ -1,5 +1,6 @@
 # tests/api/test_app_settings.py
 """Settings that differ between local development and production."""
+
 import json
 import os
 import subprocess

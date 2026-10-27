@@ -7,6 +7,7 @@ does) so they do not block the event loop.
 
 `db` must be an `AsyncSession`.
 """
+
 import asyncio
 
 import bcrypt
@@ -72,10 +73,7 @@ async def create_user(db: AsyncSession, user_in: UserCreate) -> User:
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
-        if (
-            isinstance(exc.orig, UniqueViolation)
-            and exc.orig.diag.constraint_name == EMAIL_UNIQUE_INDEX
-        ):
+        if isinstance(exc.orig, UniqueViolation) and exc.orig.diag.constraint_name == EMAIL_UNIQUE_INDEX:
             raise EmailTakenError(user_in.email) from exc
         raise
     await db.refresh(user)

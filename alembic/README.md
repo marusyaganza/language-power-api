@@ -7,6 +7,7 @@ Alembic migrations for the PostgreSQL schema. Commands run from the project root
 - `env.py` takes the database URL from `settings.database_url`, so migrations always run against the same database as the app. The `sqlalchemy.url` in `alembic.ini` is a placeholder and is never used.
 - Migrations run through the same async driver as the app (`postgresql+psycopg`).
 - `env.py` imports every module that defines models (`users.models`, `words.models`, `games.models`). A new model module must be added there too. Otherwise autogenerate does not see its tables and writes a migration that drops them.
+- `alembic.ini` runs `ruff check --fix` and `ruff format` on every new migration, so it passes CI's lint step as written.
 
 ## Adding a migration
 

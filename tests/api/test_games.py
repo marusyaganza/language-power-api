@@ -29,9 +29,13 @@ async def start(client, game_type, **body):
 
 
 async def answer(client, session, word_id, text):
-    return await client.post(f"/games/sessions/{session['session_id']}/answers", json={
-        "word_id": word_id, "answer": text,
-    })
+    return await client.post(
+        f"/games/sessions/{session['session_id']}/answers",
+        json={
+            "word_id": word_id,
+            "answer": text,
+        },
+    )
 
 
 async def result(client, session):
@@ -42,6 +46,7 @@ async def result(client, session):
 # Listing and starting
 # --------------------------------------------------------------------------- #
 
+
 async def test_list_counts_the_words_each_game_can_use(client, games):
     await save_word(client, "plain")
     await save_word(client, "sound", audio_url="https://a/x.mp3")
@@ -50,8 +55,12 @@ async def test_list_counts_the_words_each_game_can_use(client, games):
     games_by_type = {g["game_type"]: g for g in (await client.get("/games", params={"language": "es"})).json()}
     counts = {t: g["total_word_count"] for t, g in games_by_type.items()}
     assert counts == {
-        "type_word": 3, "select_def": 3, "select_word": 3,
-        "audio": 1, "image": 1, "gender": 1,
+        "type_word": 3,
+        "select_def": 3,
+        "select_word": 3,
+        "audio": 1,
+        "image": 1,
+        "gender": 1,
     }
     # Never practiced, so every word is due.
     assert all(g["due_word_count"] == g["total_word_count"] for g in games_by_type.values())
@@ -100,6 +109,7 @@ async def test_type_word_question_hides_the_word_in_its_clues(client, games):
 # --------------------------------------------------------------------------- #
 # Playing
 # --------------------------------------------------------------------------- #
+
 
 async def test_answer_is_graded_and_progress_saved(client, db, games):
     word = await save_word(client, "casa")
@@ -201,9 +211,7 @@ async def test_select_def_options_consider_the_whole_pool(client, db, games):
     # question for "ser" the verb, the player only sees "ser", so "being" would
     # be a second correct option. Excluding it needs both "ser" entries from
     # the pool, which is loaded as summaries (words.service.get_word_summaries).
-    ser_verb = await save_word(
-        client, "ser", uuid="ser-verb", defs=["to be"], examples=[{"text": "quiero ser feliz"}]
-    )
+    ser_verb = await save_word(client, "ser", uuid="ser-verb", defs=["to be"], examples=[{"text": "quiero ser feliz"}])
     await save_word(client, "ser", uuid="ser-noun", defs=["being"])
     await save_word(client, "ente", defs=["being"])
     for name, meaning in [("perro", "dog"), ("gato", "cat"), ("casa", "house")]:
@@ -224,6 +232,7 @@ async def test_select_def_options_consider_the_whole_pool(client, db, games):
 # --------------------------------------------------------------------------- #
 # Spaced repetition across sessions
 # --------------------------------------------------------------------------- #
+
 
 async def test_a_learned_word_waits_until_it_is_due(client, games):
     word = await save_word(client, "casa")
@@ -260,6 +269,7 @@ async def test_extra_practice_does_not_move_the_schedule(client, db, games):
 # --------------------------------------------------------------------------- #
 # Result
 # --------------------------------------------------------------------------- #
+
 
 async def test_result_finishes_the_session_and_counts_unanswered(client, games):
     for name in ["uno", "dos", "tres"]:

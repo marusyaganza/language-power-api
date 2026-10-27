@@ -82,6 +82,7 @@ def test_query_of_only_dots_makes_no_request(requests, query):
 def _raise(exc_type):
     def handler(request: httpx.Request) -> httpx.Response:
         raise exc_type("boom", request=request)
+
     return handler
 
 

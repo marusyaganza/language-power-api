@@ -10,6 +10,7 @@ start over when the instance restarts.
 Not thread-safe: use it from the event loop only. `acquire` never awaits, so
 two requests can't both pass a check that only one of them should.
 """
+
 import time
 from collections import deque
 from collections.abc import Callable

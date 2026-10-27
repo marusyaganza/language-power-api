@@ -4,6 +4,7 @@ Used when the `use_mocks` setting is on (see `dictionary.providers`). The
 responses live in `FIXTURES_DIR/<language>/<query>.json` and are recorded by
 `create_mocks.py`.
 """
+
 import json
 from pathlib import Path
 

@@ -4,6 +4,7 @@ Handlers only translate between HTTP and `auth.service`: they read the
 request, set or clear the session cookie, and map service errors to status
 codes. What each operation does is documented on the service functions.
 """
+
 from contextlib import contextmanager
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status

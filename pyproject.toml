@@ -1,0 +1,19 @@
+# Tool settings only; dependencies are in requirements*.txt.
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, import order, pyupgrade, bugbear.
+select = ["E", "W", "F", "I", "UP", "B"]
+ignore = [
+    # FastAPI declares dependencies as argument defaults (`Depends(...)`).
+    "B008",
+    # `class X(str, Enum)` -> `StrEnum` changes what str() and f-strings print.
+    "UP042",
+]
+
+[tool.ruff.lint.isort]
+# The alembic/ folder holds migrations; `alembic` itself is the installed package.
+known-third-party = ["alembic"]

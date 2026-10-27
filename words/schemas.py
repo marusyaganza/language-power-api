@@ -1,19 +1,23 @@
-from pydantic import BaseModel, Field, field_validator, BeforeValidator
-from typing import Annotated, Literal
 from enum import Enum
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, BeforeValidator, Field, field_validator
 
 from dictionary.entry import unique_definitions
 from words.language import Language
+
 
 def _empty_str_to_none(value):
     if isinstance(value, str) and value.strip() == "":
         return None
     return value
 
+
 OptionalStr = Annotated[str | None, BeforeValidator(_empty_str_to_none)]
 # "both": the noun takes either gender (el/la ecologista).
 Gender = Literal["masculine", "feminine", "both"]
 OptionalGender = Annotated[Gender | None, BeforeValidator(_empty_str_to_none)]
+
 
 class ExampleItem(BaseModel):
     text: str
@@ -62,6 +66,7 @@ class WordOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
 class VocabularySortBy(str, Enum):
     created_at = "created_at"
     name = "name"
@@ -78,6 +83,7 @@ class VocabularyPage(BaseModel):
     page_size: int
     total: int
     total_pages: int
+
 
 class ExampleUpdate(BaseModel):
     text: str
@@ -100,6 +106,7 @@ class WordUpdate(BaseModel):
         if not cleaned:
             raise ValueError("Definitions must contain at least one non-empty string")
         return unique_definitions(cleaned)
+
 
 class WordSearchResponse(BaseModel):
     words: list[WordOut]

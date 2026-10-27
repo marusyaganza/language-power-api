@@ -21,6 +21,7 @@ Rules that apply to every function below:
   about HTTP; the router decides how each error is presented.
 * `db` must be an `AsyncSession`.
 """
+
 import logging
 import random
 from collections.abc import Callable
@@ -38,8 +39,8 @@ from games.constants import (
     GAME_TYPE_REQUIREMENTS,
 )
 from games.hints import hidden_definitions
-from games.options import definition_options, word_options
 from games.models import Game, GameSettings, ReviewLog, WordProgress
+from games.options import definition_options, word_options
 from games.schemas import (
     GameMode,
     GameOut,
@@ -111,6 +112,7 @@ MAX_DEFINITIONS_PER_QUESTION = 3
 # Errors
 # --------------------------------------------------------------------------- #
 
+
 class GamesError(Exception):
     """Base class for every error this module raises on purpose."""
 
@@ -147,9 +149,8 @@ class NotEnoughWordsError(GamesError):
 # Listing and starting games
 # --------------------------------------------------------------------------- #
 
-async def list_games_for_language(
-    db: AsyncSession, user_id: int, language: str
-) -> list[GameOut]:
+
+async def list_games_for_language(db: AsyncSession, user_id: int, language: str) -> list[GameOut]:
     """List the games offered for `language`, in display order (`Game.order_num`).
 
     A game is offered if it is marked for all languages or is linked to
@@ -362,26 +363,16 @@ async def _start_session(
     new_words_first: bool,
     spec: _GameSpec,
 ) -> GameSessionOut:
-    words_per_session = game.default_config.get(
-        "words_per_session", DEFAULT_WORDS_PER_SESSION
-    )
+    words_per_session = game.default_config.get("words_per_session", DEFAULT_WORDS_PER_SESSION)
     schedules = await _load_schedules(db, user_id, language, game.game_type)
     if spec.options_from_pool and len(schedules) < _min_word_count(game):
-        raise NotEnoughWordsError(
-            f"This game needs at least {_min_word_count(game)} words"
-        )
-    word_ids = _pick_word_ids(
-        schedules, mode, new_words_first, datetime.now(UTC), words_per_session
-    )
+        raise NotEnoughWordsError(f"This game needs at least {_min_word_count(game)} words")
+    word_ids = _pick_word_ids(schedules, mode, new_words_first, datetime.now(UTC), words_per_session)
 
     # Options are compared against every word the game can use, so that no
     # second correct answer slips in, but only through summaries: the full
     # words (with examples) are loaded just for the session's questions.
-    pool = (
-        await get_word_summaries(db, user_id, [s.word_id for s in schedules])
-        if spec.options_from_pool
-        else []
-    )
+    pool = await get_word_summaries(db, user_id, [s.word_id for s in schedules]) if spec.options_from_pool else []
     words = await get_words_by_ids(db, user_id, word_ids)
     random.shuffle(words)
 
@@ -414,9 +405,7 @@ class _WordSchedule:
         return self.is_new or self.next_review_date <= now
 
 
-async def _load_schedules(
-    db: AsyncSession, user_id: int, language: str, game_type: str
-) -> list[_WordSchedule]:
+async def _load_schedules(db: AsyncSession, user_id: int, language: str, game_type: str) -> list[_WordSchedule]:
     """The schedule of every saved word in `language` that this game type can use."""
     requirements = GAME_TYPE_REQUIREMENTS.get(game_type, {})
     word_ids = await get_word_ids(db, user_id, language, **requirements)
@@ -441,9 +430,7 @@ def _pick_word_ids(
 
     practiced = [s for s in schedules if not s.is_new]
     if mode == GameMode.SPACED:
-        practiced = sorted(
-            (s for s in practiced if s.is_due(now)), key=lambda s: s.next_review_date
-        )
+        practiced = sorted((s for s in practiced if s.is_due(now)), key=lambda s: s.next_review_date)
     else:
         practiced = sorted(practiced, key=lambda s: s.last_reviewed_at or _NEVER)
 
@@ -454,6 +441,7 @@ def _pick_word_ids(
 # --------------------------------------------------------------------------- #
 # Answering
 # --------------------------------------------------------------------------- #
+
 
 @dataclass(frozen=True)
 class AnswerCheck:
@@ -470,9 +458,7 @@ class AnswerCheck:
     game_type: str
 
 
-async def check_answer(
-    user_id: int, session_id: str, word_id: int, answer: str
-) -> AnswerCheck:
+async def check_answer(user_id: int, session_id: str, word_id: int, answer: str) -> AnswerCheck:
     """Grade `answer` for the question about `word_id` and mark it answered.
 
     Typed games are graded with `classify_typed_answer`, all others with
@@ -505,9 +491,7 @@ async def check_answer(
 
     game_type = session_data["game_type"]
     grade = _grade(game_type, answer, question["answer"])
-    session_complete = await mark_question_answered(
-        session_id, session_data, word_id, grade.value
-    )
+    session_complete = await mark_question_answered(session_id, session_data, word_id, grade.value)
 
     return AnswerCheck(
         grade=grade,
@@ -550,6 +534,7 @@ async def _get_own_session(user_id: int, session_id: str) -> dict:
 # --------------------------------------------------------------------------- #
 # Result
 # --------------------------------------------------------------------------- #
+
 
 async def get_session_result(user_id: int, session_id: str) -> GameResultOut:
     """Finish the game session if it is still running and return its result.
@@ -610,6 +595,7 @@ def _percent_half_up(part: int, total: int) -> int:
 # Learning progress
 # --------------------------------------------------------------------------- #
 
+
 async def persist_review_result(
     db: AsyncSession, user_id: int, word_id: int, game_type: str, grade: AnswerGrade
 ) -> None:
@@ -666,6 +652,7 @@ async def persist_review_result(
 # Settings
 # --------------------------------------------------------------------------- #
 
+
 def list_game_settings_presets() -> list[GameSettingsPreset]:
     """The presets a user can pick from, the first being the default."""
     return [GameSettingsPreset(**preset) for preset in GAME_SETTINGS_PRESETS]
@@ -677,9 +664,7 @@ async def get_game_settings(db: AsyncSession, user_id: int) -> GameSettingsOut:
     return GameSettingsOut(**settings.model_dump(), preset=_preset_id(settings))
 
 
-async def update_game_settings(
-    db: AsyncSession, user_id: int, settings: GameSettingsUpdate
-) -> GameSettingsOut:
+async def update_game_settings(db: AsyncSession, user_id: int, settings: GameSettingsUpdate) -> GameSettingsOut:
     """Replace the user's spaced-repetition settings.
 
     They apply to each word from its next answer on; reviews already
@@ -726,9 +711,7 @@ async def _load_config(db: AsyncSession, user_id: int) -> SpacedRepetitionConfig
 
 
 def _preset_id(settings: GameSettingsUpdate) -> str:
-    return next(
-        (p.id for p in list_game_settings_presets() if p.settings == settings), "custom"
-    )
+    return next((p.id for p in list_game_settings_presets() if p.settings == settings), "custom")
 
 
 # The fields shared by `WordProgress` (the row) and `WordProgressState` (what

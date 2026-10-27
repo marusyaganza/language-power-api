@@ -4,6 +4,7 @@ Handlers only translate between HTTP and `words.service`: they read the
 request, pass in the acting user, and map service errors to status codes.
 What each operation actually does is documented on the service functions.
 """
+
 from contextlib import contextmanager
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -64,9 +65,7 @@ async def search_words(
     Spelling suggestions are a normal 200 response.
     """
     with _http_errors():
-        return await service.search_words(
-            db, current_user.id, query=query, language=language
-        )
+        return await service.search_words(db, current_user.id, query=query, language=language)
 
 
 @router.post("/words/save", response_model=WordOut, status_code=status.HTTP_201_CREATED)

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, EmailStr, ConfigDict
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr
 
 # Counted in characters (code points), like Python's len().
 MIN_PASSWORD_LENGTH = 8
@@ -40,11 +40,13 @@ class UserCreate(BaseModel):
     email: Email
     password: NewPassword
 
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     email: EmailStr
+
 
 class LoginRequest(BaseModel):
     email: Email

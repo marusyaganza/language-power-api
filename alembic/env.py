@@ -2,22 +2,19 @@
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from alembic import context
-
-# --- app imports ---
-from core.database import Base
-from settings import settings
-
-# import every module that defines models, so Base.metadata knows about them.
-# Without these, autogenerate sees no tables and emits a migration that drops them all.
+# Import every module that defines models, so Base.metadata knows about them.
+# Without these, autogenerate sees no tables and emits a migration that drops
+# them all. Add new model modules here.
+import games.models  # noqa: F401
 import users.models  # noqa: F401
 import words.models  # noqa: F401
-import games.models  # noqa: F401
-# add new model modules here as you create them
+from core.database import Base
+from settings import settings
 
 config = context.config
 

@@ -4,6 +4,7 @@
 Sentry is started for real, with a transport that keeps events in a list
 instead of sending them.
 """
+
 import json
 
 import httpx
@@ -33,11 +34,15 @@ def sentry_events():
             if event is not None:
                 events.append(event)
 
-    options = sentry_options(settings.model_copy(update={
-        "sentry_dsn": SecretStr("https://public@sentry.invalid/1"),
-        "sentry_environment": "test",
-        "sentry_release": "abc123",
-    }))
+    options = sentry_options(
+        settings.model_copy(
+            update={
+                "sentry_dsn": SecretStr("https://public@sentry.invalid/1"),
+                "sentry_environment": "test",
+                "sentry_release": "abc123",
+            }
+        )
+    )
     sentry_sdk.init(**options, transport=KeepEvents())
     assert not sentry_sdk.get_client().should_send_default_pii()
     try:

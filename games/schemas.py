@@ -1,12 +1,15 @@
 from datetime import datetime
 from enum import Enum
+from itertools import pairwise
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-from words.schemas import ExampleItem
+
 from games.scoring import AnswerGrade
 from games.spaced_repetition import DEFAULT_CONFIG
 from words.language import Language
+from words.schemas import ExampleItem
+
 
 class GameMode(str, Enum):
     SPACED = "spaced"  # only words that are due
@@ -26,6 +29,7 @@ class GameOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
 class QuestionAdditionalInfo(BaseModel):
     audio_url: str | None = None
     img_url: str | None = None
@@ -33,6 +37,7 @@ class QuestionAdditionalInfo(BaseModel):
     definition: str | None = Field(default=None, alias="def")
 
     model_config = {"from_attributes": True, "populate_by_name": True}
+
 
 class QuestionOut(BaseModel):
     id: int
@@ -42,6 +47,7 @@ class QuestionOut(BaseModel):
     options: list[str] | None = None  # multiple-choice games only
     alt: str | None = None  # image game only: a text clue if the image fails to load
     additional_info: QuestionAdditionalInfo
+
 
 class GameSessionCreate(BaseModel):
     language: Language
@@ -105,7 +111,7 @@ class GameSettingsUpdate(BaseModel):
     def steps_must_increase(cls, steps: list[int]) -> list[int]:
         if any(step < 1 or step > MAX_INTERVAL_DAYS * 24 * 60 for step in steps):
             raise ValueError(f"Each learning step must be between 1 minute and {MAX_INTERVAL_DAYS} days")
-        if any(later <= earlier for earlier, later in zip(steps, steps[1:])):
+        if any(later <= earlier for earlier, later in pairwise(steps)):
             raise ValueError("Learning steps must get longer each time")
         return steps
 

@@ -15,6 +15,7 @@ Rules that apply to every function below:
 Logins and signups are rate-limited in memory (`auth.rate_limit`, limits in
 `settings`): logins per email, signups all together.
 """
+
 import asyncio
 import math
 import secrets
@@ -50,6 +51,7 @@ __all__ = [
 # --------------------------------------------------------------------------- #
 # Errors
 # --------------------------------------------------------------------------- #
+
 
 class AuthError(Exception):
     """Base class for every error this module raises on purpose."""
@@ -91,6 +93,7 @@ def _count_attempt(limiter: AttemptLimiter, key: str) -> None:
     wait = limiter.acquire(key)
     if wait is not None:
         raise TooManyAttemptsError(retry_after=math.ceil(wait))
+
 
 @dataclass(frozen=True)
 class AuthResult:
@@ -173,6 +176,7 @@ async def login(db: AsyncSession, credentials: LoginRequest) -> AuthResult:
 # --------------------------------------------------------------------------- #
 # Sessions
 # --------------------------------------------------------------------------- #
+
 
 def _session_key(session_id: str) -> str:
     return f"session:{session_id}"

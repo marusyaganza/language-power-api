@@ -4,6 +4,7 @@
 The database does it (ON DELETE CASCADE down the whole chain), so a plain SQL
 DELETE works as well as deleting through the ORM.
 """
+
 import pytest
 from sqlalchemy import delete, func, select
 
@@ -53,7 +54,11 @@ async def test_sql_delete_removes_everything_the_user_owns(client, make_client, 
     await db.execute(delete(User).where(User.id == user_id))
 
     assert await _counts(db) == {
-        "Word": 1, "Example": 0, "WordProgress": 0, "ReviewLog": 0, "GameSettings": 0,
+        "Word": 1,
+        "Example": 0,
+        "WordProgress": 0,
+        "ReviewLog": 0,
+        "GameSettings": 0,
     }
 
 

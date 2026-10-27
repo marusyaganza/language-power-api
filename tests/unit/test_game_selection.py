@@ -4,6 +4,7 @@
 These test private helpers of games.service directly: their logic is easy to
 get wrong and slow to reach through the API.
 """
+
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -27,10 +28,10 @@ def practiced(word_id, *, due_in_days, reviewed_days_ago):
 
 
 SCHEDULES = [
-    practiced(1, due_in_days=-1, reviewed_days_ago=5),   # due
-    practiced(2, due_in_days=-3, reviewed_days_ago=9),   # due, more overdue
-    practiced(3, due_in_days=2, reviewed_days_ago=1),    # not due
-    practiced(4, due_in_days=4, reviewed_days_ago=20),   # not due, practiced longest ago
+    practiced(1, due_in_days=-1, reviewed_days_ago=5),  # due
+    practiced(2, due_in_days=-3, reviewed_days_ago=9),  # due, more overdue
+    practiced(3, due_in_days=2, reviewed_days_ago=1),  # not due
+    practiced(4, due_in_days=4, reviewed_days_ago=20),  # not due, practiced longest ago
     new(5),
     new(6),
 ]
@@ -69,9 +70,9 @@ def test_limit_keeps_the_first_words_in_order():
 @pytest.mark.parametrize(
     ("part", "total", "percent"),
     [
-        (0, 0, 0),     # empty session
-        (1, 8, 13),    # 12.5 rounds up, not to even
-        (3, 8, 38),    # 37.5
+        (0, 0, 0),  # empty session
+        (1, 8, 13),  # 12.5 rounds up, not to even
+        (3, 8, 38),  # 37.5
         (1, 3, 33),
         (2, 3, 67),
         (5, 5, 100),

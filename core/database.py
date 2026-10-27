@@ -1,4 +1,5 @@
 """The database engine and session factory. Everything here is async."""
+
 from collections.abc import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

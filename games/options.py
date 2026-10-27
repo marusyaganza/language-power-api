@@ -7,6 +7,7 @@ answer.
 
 Texts are compared ignoring case and spacing.
 """
+
 import random
 from typing import Protocol
 
@@ -22,9 +23,7 @@ class OptionWord(Protocol):
     defs: list[str]
 
 
-def definition_options(
-    target: OptionWord, pool: list[OptionWord], count: int
-) -> tuple[str, list[str]]:
+def definition_options(target: OptionWord, pool: list[OptionWord], count: int) -> tuple[str, list[str]]:
     """select_def: return the answer (the target's first definition) and the shuffled options.
 
     Every definition is shown with its own word hidden, so blanks do not
@@ -44,7 +43,7 @@ def definition_options(
             break
         if _key(word.name) == _key(target.name):
             continue
-        for raw, definition in zip(word.defs, hidden_definitions(word.name, word.stems, word.defs)):
+        for raw, definition in zip(word.defs, hidden_definitions(word.name, word.stems, word.defs), strict=True):
             if (
                 _key(raw) not in correct_meanings
                 and _key(definition) not in used

@@ -2,20 +2,20 @@
 
 Run with `python -m games.seed`. Safe to run repeatedly.
 """
+
 import asyncio
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from core.database import AsyncSessionLocal, engine
-from games.models import Game, GameLanguage
-from games.seed_data import GAME_DEFINITIONS
-
 # Relationships between models are resolved by class name across modules, so
 # every model module must be imported before the first query.
 import users.models  # noqa: F401
 import words.models  # noqa: F401
+from core.database import AsyncSessionLocal, engine
+from games.models import Game, GameLanguage
+from games.seed_data import GAME_DEFINITIONS
 
 
 async def sync_games(db: AsyncSession) -> None:
@@ -23,9 +23,7 @@ async def sync_games(db: AsyncSession) -> None:
         all_languages = definition["all_languages"]
         languages = definition["languages"]
         game = await db.scalar(
-            select(Game)
-            .options(selectinload(Game.languages))
-            .where(Game.slug == definition["slug"])
+            select(Game).options(selectinload(Game.languages)).where(Game.slug == definition["slug"])
         )
 
         if game is None:

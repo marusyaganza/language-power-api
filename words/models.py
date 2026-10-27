@@ -39,9 +39,7 @@ class Word(Base):
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="words", lazy="raise")
-    examples: Mapped[list["Example"]] = relationship(
-        back_populates="word", cascade="all, delete-orphan", lazy="raise"
-    )
+    examples: Mapped[list["Example"]] = relationship(back_populates="word", cascade="all, delete-orphan", lazy="raise")
     progress: Mapped[list["WordProgress"]] = relationship(
         back_populates="word", cascade="all, delete-orphan", lazy="raise"
     )

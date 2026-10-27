@@ -17,9 +17,9 @@ class SpacedRepetitionConfig:
     # Never shorter than the last learning step: graduating must not bring
     # the next review closer than the step the word just passed.
     graduating_interval_days: float = 6.0
-    interval_growth_factor: float = 2.0       # multiplier on a correct answer
-    close_growth_factor: float = 1.2          # smaller multiplier on a near-miss
-    lapse_penalty_factor: float = 0.5         # interval shrink on a wrong answer, graduated word
+    interval_growth_factor: float = 2.0  # multiplier on a correct answer
+    close_growth_factor: float = 1.2  # smaller multiplier on a near-miss
+    lapse_penalty_factor: float = 0.5  # interval shrink on a wrong answer, graduated word
     max_interval_days: float = 90.0
     # strict_mode=True makes WRONG on a graduated word drop back into
     # learning_steps entirely, instead of just shrinking the interval —
@@ -67,18 +67,14 @@ def update_progress(
     if state.is_learning:
         # The user may have removed learning steps since the word's last
         # review; continue from the last step that still exists.
-        state.learning_step_index = min(
-            state.learning_step_index, len(config.learning_steps_minutes) - 1
-        )
+        state.learning_step_index = min(state.learning_step_index, len(config.learning_steps_minutes) - 1)
         if grade == AnswerGrade.WRONG:
             state.learning_step_index = 0
             state.lapses += 1
             state.next_review_date = now + timedelta(minutes=config.learning_steps_minutes[0])
         elif grade == AnswerGrade.CLOSE:
             # repeat the current step rather than advancing or resetting
-            state.next_review_date = now + timedelta(
-                minutes=config.learning_steps_minutes[state.learning_step_index]
-            )
+            state.next_review_date = now + timedelta(minutes=config.learning_steps_minutes[state.learning_step_index])
         else:  # CORRECT
             if state.learning_step_index < len(config.learning_steps_minutes) - 1:
                 state.learning_step_index += 1
