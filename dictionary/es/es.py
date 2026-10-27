@@ -23,7 +23,7 @@ class SpanishDictionaryProvider(DictionaryProvider):
         raw_items = await self._fetch_raw(query)
         if is_suggestion_response(raw_items):
             return SearchResult(suggestions=raw_items)
-        return SearchResult(words=format_entries(raw_items, self._format))
+        return SearchResult(words=format_entries(_spanish_headwords(raw_items), self._format))
 
     async def _fetch_raw(self, query: str) -> list:
         return await fetch_entries(API_URL, settings.spanish_api_key.get_secret_value(), query)
@@ -51,3 +51,20 @@ class SpanishDictionaryProvider(DictionaryProvider):
             examples=examples,
             gender=gender,
         )
+
+
+def _spanish_headwords(raw_items: list) -> list:
+    """Drop the English half of the bilingual dictionary.
+
+    A search for an English word ("dog") returns English entries
+    (`meta.lang` "en") translated into Spanish. They are not Spanish words,
+    and their audio is not under the Spanish path. Entries with an unexpected
+    shape are kept, so `format_entries` still reports them.
+    """
+    return [item for item in raw_items if _headword_language(item) in ("es", None)]
+
+
+def _headword_language(item) -> str | None:
+    """The entry's `meta.lang` ("es" or "en"), or None if it has none."""
+    meta = item.get("meta") if isinstance(item, dict) else None
+    return meta.get("lang") if isinstance(meta, dict) else None

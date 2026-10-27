@@ -180,6 +180,21 @@ def test_the_name_is_the_headword(provider_class, monkeypatch, meta_id, headword
     assert word.name == name
 
 
+# Regression: MW's Spanish dictionary is bilingual, and English headwords
+# were saved as Spanish words with a broken audio URL.
+def test_spanish_search_keeps_only_spanish_headwords(monkeypatch):
+    dog, perro = entry("dog"), entry("perro")
+    dog["meta"]["lang"], perro["meta"]["lang"] = "en", "es"
+    result = search(SpanishDictionaryProvider, monkeypatch, [dog, perro])
+    assert [w.name for w in result.words] == ["perro"]
+
+
+def test_a_spanish_search_with_only_english_headwords_finds_nothing(monkeypatch):
+    dog = entry("dog")
+    dog["meta"]["lang"] = "en"
+    assert search(SpanishDictionaryProvider, monkeypatch, [dog]).is_empty
+
+
 @pytest.mark.parametrize("provider_class", PROVIDERS)
 def test_strings_mixed_into_entries_are_skipped(provider_class, monkeypatch):
     result = search(provider_class, monkeypatch, ["casas", entry("casa")])
