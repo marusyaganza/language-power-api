@@ -216,8 +216,17 @@ def extract_audio(word, language, countryCode):
     return audio_url
 
 
-def format_name(str):
-    return "".join(c for c in str if c != ":" and not c.isnumeric())
+def format_name(word) -> str:
+    """The headword as MW displays it: "jamás", "Stark", "borrow".
+
+    `hwi.hw` marks syllable breaks with "*" ("Bor*row"), which are removed.
+    `meta.id` is only a fallback for an entry without `hwi`: it has no accents
+    and ends in a homograph suffix after ":" ("jamas", "Stark:b1").
+    """
+    headword = (word.get("hwi") or {}).get("hw")
+    if headword:
+        return headword.replace("*", "")
+    return word["meta"]["id"].split(":")[0]
 
 
 def extract_transcription(word):

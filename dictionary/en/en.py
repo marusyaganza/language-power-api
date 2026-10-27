@@ -33,7 +33,7 @@ class EnglishDictionaryProvider(DictionaryProvider):
 
     def _format(self, word):
         meta = word["meta"]
-        name = format_name(meta["id"])
+        name = format_name(word)
         language = Language("en")
         uuid = meta["uuid"]
         stems = meta["stems"]

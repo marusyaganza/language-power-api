@@ -159,6 +159,23 @@ def test_an_entry_without_pronunciation_is_still_a_word(provider_class, monkeypa
 
 
 @pytest.mark.parametrize("provider_class", PROVIDERS)
+@pytest.mark.parametrize(
+    ("meta_id", "headword", "name"),
+    [
+        ("jamas", "jamás", "jamás"),  # the id has no accents
+        ("Stark:b1", "Stark", "Stark"),  # a person; the id ends in ":b1"
+        ("Borrow:b", "Bor*row", "Borrow"),  # "*" marks syllables
+    ],
+)
+def test_the_name_is_the_headword(provider_class, monkeypatch, meta_id, headword, name):
+    raw = entry("casa")
+    raw["meta"]["id"] = meta_id
+    raw["hwi"]["hw"] = headword
+    [word] = search(provider_class, monkeypatch, [raw]).words
+    assert word.name == name
+
+
+@pytest.mark.parametrize("provider_class", PROVIDERS)
 def test_strings_mixed_into_entries_are_skipped(provider_class, monkeypatch):
     result = search(provider_class, monkeypatch, ["casas", entry("casa")])
     assert [w.name for w in result.words] == ["casa"]
