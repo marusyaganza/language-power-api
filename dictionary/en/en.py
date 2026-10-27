@@ -1,7 +1,7 @@
 from words.language import Language
 from dictionary.base import DictionaryProvider
 from dictionary.helpers.mw import fetch_entries, format_entries, extract_examples, extract_audio, extract_image, extract_image_desc, extract_transcription, format_name, extract_definitions, is_suggestion_response
-from words.word import Word, unique_definitions
+from dictionary.entry import DictionaryEntry, unique_definitions
 from dictionary.base import SearchResult
 from settings import settings
 
@@ -34,7 +34,11 @@ class EnglishDictionaryProvider(DictionaryProvider):
         img_url = extract_image(word)
         img_desc = extract_image_desc(word)
 
-        return Word(name=name, language=language, uuid=uuid, stems=stems, fl=fl, defs=defs, audio_url = audio_url, transcription = transcription, examples = examples, img_url = img_url, img_desc = img_desc)
+        return DictionaryEntry(
+            uuid=uuid, name=name, language=language, fl=fl, stems=stems, defs=defs,
+            audio_url=audio_url, transcription=transcription, img_url=img_url, img_desc=img_desc,
+            examples=examples,
+        )
 
 
 

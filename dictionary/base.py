@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from words.word import Word
+
+from dictionary.entry import DictionaryEntry
 
 
 @dataclass
@@ -11,7 +12,7 @@ class SearchResult:
     fixture: the queries that do.
     """
 
-    words: list[Word] = field(default_factory=list)
+    words: list[DictionaryEntry] = field(default_factory=list)
     suggestions: list[str] = field(default_factory=list)
     mock_queries: list[str] = field(default_factory=list)
 

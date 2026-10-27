@@ -21,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Strip definitions and drop repeats, keeping the first of each.
 
-    Same rule as `words.word.unique_definitions`: definitions that differ only
+    Same rule as `dictionary.entry.unique_definitions`: definitions that differ only
     in case or spacing are repeats. Only rows that change are updated.
     """
     op.execute(

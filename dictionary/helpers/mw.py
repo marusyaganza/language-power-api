@@ -6,8 +6,7 @@ from urllib.parse import quote
 import httpx
 
 from dictionary.base import DictionaryError
-from words.example import Example
-from words.word import Word
+from dictionary.entry import DictionaryEntry, DictionaryExample
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +55,7 @@ async def fetch_entries(api_url: str, api_key: str, query: str) -> list:
         raise DictionaryError(f"MW answered with a JSON {type(data).__name__}, not a list")
     return data
 
-def format_entries(raw_items: list, format_entry: Callable[[dict], Word]) -> list[Word]:
+def format_entries(raw_items: list, format_entry: Callable[[dict], DictionaryEntry]) -> list[DictionaryEntry]:
     """Format the entries of an MW response, skipping any with an unexpected shape.
 
     `format_entry` is the language's own formatter. Entries without
@@ -70,7 +69,7 @@ def format_entries(raw_items: list, format_entry: Callable[[dict], Word]) -> lis
             words would read as "word not found"; this is MW answering in a
             shape the code doesn't know, so it is reported as a failure.
     """
-    words: list[Word] = []
+    words: list[DictionaryEntry] = []
     malformed = 0
     for item in raw_items:
         try:
@@ -180,7 +179,7 @@ def extract_image_desc(word) -> str | None:
 def _format_example(example):
     t = strip_mw_markup(example.get('t'))
     tr = example.get('tr', None)
-    return Example(text=t, translation=tr)
+    return DictionaryExample(text=t, translation=tr)
 
 def extract_audio(word, language, countryCode): 
     """

@@ -2,8 +2,8 @@ from pydantic import BaseModel, Field, field_validator, BeforeValidator
 from typing import Annotated, Literal
 from enum import Enum
 
+from dictionary.entry import unique_definitions
 from words.language import Language
-from words.word import unique_definitions
 
 def _empty_str_to_none(value):
     if isinstance(value, str) and value.strip() == "":
