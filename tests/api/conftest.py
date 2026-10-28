@@ -103,6 +103,15 @@ async def make_client(db, redis, monkeypatch):
     Each client keeps its own cookies, so two clients are two users.
     """
     monkeypatch.setattr(settings, "signup_enabled", True)
+    # The demo's limits start off whatever `.env` says; tests turn them on one at a time.
+    for name in (
+        "searches_per_language",
+        "daily_searches_per_language",
+        "daily_signup_limit",
+        "account_ttl_hours",
+        "max_words_per_user",
+    ):
+        monkeypatch.setattr(settings, name, None)
     # Fresh rate limits for every test (the app's are shared by the process).
     monkeypatch.setattr(
         auth.service,

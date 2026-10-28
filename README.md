@@ -148,6 +148,7 @@ Settings are read from the environment, then from `.env`. Names are case-insensi
 | `COOKIE_SECURE` | `false` | Send the session cookie over HTTPS only; `true` in production |
 | `SESSION_TTL_SECONDS` | 30 days | Session lifetime |
 | `DOCS_ENABLED` | `true` | Serve `/docs`, `/redoc` and `/openapi.json`; `false` in production |
+| `ROOT_PATH` | empty | The prefix a proxy strips before forwarding (`/api` behind Netlify), so `/docs` works through it |
 | `CORS_ORIGINS` | `["http://localhost:5173"]` | JSON list of browser origins allowed to call the API; `[]` turns CORS off |
 | `SIGNUP_IP_LIMIT`, `LOGIN_IP_LIMIT` | 5, 30 | Signups an hour and login attempts per 15 minutes from one IP, where the IP is known (behind the signed proxy) |
 | `REQUEST_IP_LIMIT`, `REQUEST_IP_WINDOW_SECONDS` | 300, 5 minutes | Requests from one IP to any route except `/health`, where the IP is known |

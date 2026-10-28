@@ -1,6 +1,6 @@
 from typing import Self
 
-from pydantic import PositiveInt, SecretStr, model_validator
+from pydantic import Field, PositiveInt, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +24,11 @@ class Settings(BaseSettings):
 
     # /docs, /redoc and /openapi.json. Off in production.
     docs_enabled: bool = True
+    # The prefix the browser uses for the API when a proxy strips it before
+    # forwarding: "/api" behind Netlify. Then /docs loads /api/openapi.json and
+    # "Try it out" goes through the proxy. Routes match with or without the
+    # prefix, so direct calls (the uptime check's /health) still work.
+    root_path: str = Field(default="", pattern=r"^(/[^/]+)*$")
     # Browser origins allowed to call the API from another site, as JSON in the
     # environment: CORS_ORIGINS='["https://example.com"]'. Empty in production,
     # where the frontend reaches the API through its own proxy (same origin),

@@ -28,9 +28,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 if settings.docs_enabled:
-    app = FastAPI(lifespan=lifespan)
+    app = FastAPI(lifespan=lifespan, root_path=settings.root_path)
 else:
-    app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(lifespan=lifespan, root_path=settings.root_path, docs_url=None, redoc_url=None, openapi_url=None)
 
 # Every API route only answers requests from the frontend's proxy, and only so
 # many from one IP. In this order: the IP is only known once the signature is
