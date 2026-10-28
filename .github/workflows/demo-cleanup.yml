@@ -1,0 +1,88 @@
+# Daily cleanup of the public demo's database: deletes accounts older than
+# ACCOUNT_TTL_HOURS (deploy/demo.env.yaml) with all their data, and daily
+# search counts older than a week. The SQL is in deploy/demo-cleanup.sql. Also
+# runs by hand: Actions → Demo-cleanup → Run workflow. One-time setup:
+# notes/demo-cleanup.md.
+#
+# Google trusts this workflow by its name, "Demo-cleanup" (Workload Identity
+# binding); renaming it means updating that binding too.
+name: Demo-cleanup
+
+on:
+  schedule:
+    - cron: "15 4 * * *"  # daily 04:15 UTC; scheduled runs use the default branch
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write  # lets the job ask GitHub for the token Google exchanges
+
+    env:
+      GCP_PROJECT_ID: ${{ vars.DEMO_GCP_PROJECT_ID }}
+      GCP_WIF_PROVIDER: ${{ vars.DEMO_GCP_WIF_PROVIDER }}
+      GCP_CLEANUP_SA: ${{ vars.DEMO_GCP_CLEANUP_SA }}
+      # Any client works for these statements; the official image matches Neon's version.
+      PG_IMAGE: postgres:18-alpine
+
+    steps:
+      - name: Check the variables are set
+        run: |
+          missing=""
+          for name in GCP_PROJECT_ID GCP_WIF_PROVIDER GCP_CLEANUP_SA; do
+            [ -n "${!name}" ] || missing="$missing DEMO_$name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository variables:$missing"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+
+      # The same lifetime the app enforces, so the two can't drift apart.
+      - name: Read the account lifetime
+        run: |
+          TTL_HOURS=$(sed -n 's/^ACCOUNT_TTL_HOURS: *"\([0-9]*\)" *$/\1/p' deploy/demo.env.yaml)
+          if [ -z "$TTL_HOURS" ]; then
+            echo "::error::No ACCOUNT_TTL_HOURS in deploy/demo.env.yaml"
+            exit 1
+          fi
+          echo "TTL_HOURS=$TTL_HOURS" >> "$GITHUB_ENV"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WIF_PROVIDER }}
+          service_account: ${{ env.GCP_CLEANUP_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      # The connection string is read from Secret Manager (the same secret Cloud
+      # Run uses) and masked, so it never appears in the log.
+      - name: Delete expired accounts
+        run: |
+          DATABASE_URL=$(gcloud secrets versions access latest --secret DATABASE_URL --project "$GCP_PROJECT_ID")
+          echo "::add-mask::$DATABASE_URL"
+          # The app's URL names its Python driver; psql wants plain postgresql://.
+          PG_URL="${DATABASE_URL/postgresql+psycopg:/postgresql:}"
+          echo "::add-mask::$PG_URL"
+
+          OUTPUT=$(docker run --rm --network host -v "$PWD/deploy:/sql:ro" -e PG_URL="$PG_URL" "$PG_IMAGE" \
+            sh -c 'psql "$PG_URL" --single-transaction --quiet --tuples-only --no-align \
+              -v ON_ERROR_STOP=1 -v ttl_hours="$0" -f /sql/demo-cleanup.sql' "$TTL_HOURS")
+          { read -r USERS; read -r DAYS; } <<< "$OUTPUT"
+          echo "Deleted: accounts=$USERS daily_search_counts=$DAYS"
+          {
+            echo "### Demo cleanup"
+            echo "Deleted $USERS accounts older than $TTL_HOURS hours, and $DAYS daily search counts older than a week."
+          } >> "$GITHUB_STEP_SUMMARY"
