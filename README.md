@@ -61,7 +61,7 @@ Some rules hold everywhere:
 | `users/` | User model, password hashing and user lookups |
 | `words/` | Dictionary search and the saved vocabulary |
 | `games/` | Game sessions, answer grading, spaced repetition and per-user settings |
-| `dictionary/` | One provider per language (`en/`, `es/`), the shared Merriam-Webster code (`merriam_webster/`), and the mock providers |
+| `dictionary/` | One provider per language (`en/`, `es/`), the shared Merriam-Webster code (`merriam_webster/`), and the mock providers. [dictionary/README.md](dictionary/README.md) lists the steps for adding a language |
 | `dictionary/fixtures/` | Recorded Merriam-Webster responses used in mock mode |
 | `alembic/` | Database migrations |
 | `tests/` | Unit tests (`tests/unit`) and API tests against real Postgres and Redis (`tests/api`) |
