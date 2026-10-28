@@ -149,8 +149,10 @@ Settings are read from the environment, then from `.env`. Names are case-insensi
 | `SESSION_TTL_SECONDS` | 30 days | Session lifetime |
 | `DOCS_ENABLED` | `true` | Serve `/docs`, `/redoc` and `/openapi.json`; `false` in production |
 | `CORS_ORIGINS` | `["http://localhost:5173"]` | JSON list of browser origins allowed to call the API; `[]` turns CORS off |
+| `SENTRY_DSN` | none | Report errors to Sentry; unset sends nothing |
+| `SENTRY_ENVIRONMENT` | `local` | Environment name on Sentry events |
 
-The production values that are not secret are in [deploy/personal.env.yaml](deploy/personal.env.yaml). Secrets are kept in Google Secret Manager and are never part of the repository or the image.
+The production values that are not secret are in [deploy/personal.env.yaml](deploy/personal.env.yaml) and [deploy/demo.env.yaml](deploy/demo.env.yaml). Secrets are kept in Google Secret Manager and are never part of the repository or the image.
 
 ## Testing
 
@@ -201,6 +203,7 @@ The browser only ever talks to the Netlify origin, so the session cookie stays f
 - The `Dockerfile` builds a slim Python 3.12 image that runs as a non-root user. On start, `docker-entrypoint.sh` applies the migrations, syncs the games and starts Uvicorn.
 - `.github/workflows/ci.yml` runs ruff and the tests on every push and pull request.
 - `.github/workflows/deploy.yml` is started by hand. It runs the tests, builds and pushes the image, deploys it to Cloud Run, and checks that the new revision answers. GitHub authenticates to Google Cloud through Workload Identity Federation, so no service account key is stored anywhere.
+- The same image runs as two deployments, each in its own Google Cloud project with its own database, Redis and secrets: a private one (signup closed) and the public demo (open signup, `/docs` on, errors reported to Sentry). The workflow's `target` input picks one, and `deploy/<target>.env.yaml` holds its settings.
 
 ## Related projects
 

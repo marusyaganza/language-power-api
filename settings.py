@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     # Error reporting (core.sentry). No DSN: nothing is sent.
     sentry_dsn: SecretStr | None = None
-    sentry_environment: str = "local"  # personal, demo
+    sentry_environment: str = "local"  # "demo" on the demo, the only deployment with a DSN
     # The commit the image was built from; the Dockerfile sets it from GIT_SHA.
     sentry_release: str | None = None
 
