@@ -144,6 +144,18 @@ async def test_signup_open_today_follows_signup_enabled(make_client, monkeypatch
     assert config["signup_open_today"] is False
 
 
+async def test_config_has_the_limits_for_the_demo_notice(make_client, monkeypatch):
+    config = (await make_client().get("/auth/config")).json()
+    assert config["account_ttl_hours"] is None
+    assert config["searches_per_language"] is None
+
+    monkeypatch.setattr(settings, "account_ttl_hours", 24)
+    monkeypatch.setattr(settings, "searches_per_language", 10)
+    config = (await make_client().get("/auth/config")).json()
+    assert config["account_ttl_hours"] == 24
+    assert config["searches_per_language"] == 10
+
+
 # --------------------------------------------------------------------------- #
 # Account lifetime
 # --------------------------------------------------------------------------- #

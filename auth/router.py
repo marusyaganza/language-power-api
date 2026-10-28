@@ -16,6 +16,7 @@ from auth.helpers import clear_session_cookie, set_session_cookie
 from auth.schemas import LoginRequest, UserCreate, UserOut
 from core.database import get_db
 from core.proxy_signature import client_ip
+from settings import settings
 from users.models import User
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -104,12 +105,15 @@ async def auth_config(db: AsyncSession = Depends(get_db)):
     """Public settings the frontend needs before anyone is logged in.
 
     `signup_open_today` is false when signups are off or today's new accounts
-    are all taken.
+    are all taken. `account_ttl_hours` and `searches_per_language` are the
+    demo's limits, for the notice that explains them; null where they're off.
     """
     return {
         "signup_enabled": service.signups_open(),
         "signup_open_today": await service.signup_open_today(db),
         "use_mocks": service.mocks_enabled(),
+        "account_ttl_hours": settings.account_ttl_hours,
+        "searches_per_language": settings.searches_per_language,
     }
 
 
