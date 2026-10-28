@@ -149,6 +149,11 @@ Settings are read from the environment, then from `.env`. Names are case-insensi
 | `SESSION_TTL_SECONDS` | 30 days | Session lifetime |
 | `DOCS_ENABLED` | `true` | Serve `/docs`, `/redoc` and `/openapi.json`; `false` in production |
 | `CORS_ORIGINS` | `["http://localhost:5173"]` | JSON list of browser origins allowed to call the API; `[]` turns CORS off |
+| `SEARCHES_PER_LANGUAGE` | none | Dictionary searches per language an account may make; unset: unlimited |
+| `DAILY_SEARCHES_PER_LANGUAGE` | none | Dictionary searches per language per UTC day, for everyone together |
+| `DAILY_SIGNUP_LIMIT` | none | New accounts per UTC day |
+| `ACCOUNT_TTL_HOURS` | none | Accounts older than this are logged out and deleted at the next signup |
+| `MAX_WORDS_PER_USER` | none | Saved words per account |
 | `SENTRY_DSN` | none | Report errors to Sentry; unset sends nothing |
 | `SENTRY_ENVIRONMENT` | `local` | Environment name on Sentry events |
 

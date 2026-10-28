@@ -27,16 +27,21 @@ from math import ceil
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dictionary.base import DictionaryError, SearchResult
+from core import utc_day
+from core.language import Language
+from dictionary.base import DictionaryError
 from dictionary.providers import PROVIDERS
+from settings import settings
 from words import repository
 from words.models import Example, Word
 from words.schemas import (
+    SearchLimits,
     SortOrder,
     VocabularyPage,
     VocabularySortBy,
     WordCreate,
     WordOut,
+    WordSearchResponse,
     WordUpdate,
 )
 
@@ -49,8 +54,12 @@ __all__ = [
     "DictionaryUnavailableError",
     "WordNotFoundError",
     "WordAlreadySavedError",
+    "SearchLimitReachedError",
+    "DailySearchLimitReachedError",
+    "WordLimitReachedError",
     "VOCABULARY_PAGE_SIZE",
     "search_words",
+    "get_search_limits",
     "save_word",
     "update_word",
     "delete_word",
@@ -93,12 +102,31 @@ class WordAlreadySavedError(WordsError):
     """Saving the word violated a uniqueness constraint."""
 
 
+class SearchLimitReachedError(WordsError):
+    """The user has made all the dictionary searches their account allows in this language."""
+
+
+class DailySearchLimitReachedError(WordsError):
+    """Everyone together has made all of today's dictionary searches in this language.
+
+    `retry_after` is the whole seconds until the next UTC day.
+    """
+
+    def __init__(self, retry_after: int):
+        super().__init__("The demo's dictionary budget for today is used up; your saved words and games still work")
+        self.retry_after = retry_after
+
+
+class WordLimitReachedError(WordsError):
+    """The user has saved as many words as an account may have."""
+
+
 # --------------------------------------------------------------------------- #
 # Dictionary search
 # --------------------------------------------------------------------------- #
 
 
-async def search_words(db: AsyncSession, user_id: int, *, query: str, language: str) -> SearchResult:
+async def search_words(db: AsyncSession, user_id: int, *, query: str, language: str) -> WordSearchResponse:
     """Look `query` up in the dictionary for `language`.
 
     Words named exactly `query` come first, the rest in the dictionary's
@@ -111,8 +139,17 @@ async def search_words(db: AsyncSession, user_id: int, *, query: str, language: 
     mocks on) the queries that have mock data, is a normal result and is
     returned unchanged.
 
+    With search limits set (`settings.searches_per_language`,
+    `settings.daily_searches_per_language`), the search is counted and
+    committed before the dictionary is called: every search that reaches the
+    dictionary counts, whatever it returns, and a refused one doesn't.
+    `searches_left` is what the user has left in `language` afterwards (None
+    without a per-account limit).
+
     Raises:
         UnsupportedLanguageError: there is no provider for `language`.
+        SearchLimitReachedError: the user has no searches left in `language`.
+        DailySearchLimitReachedError: today's searches in `language` are used up.
         DefinitionNotFoundError: the dictionary returned nothing at all.
         DictionaryUnavailableError: the dictionary failed (unreachable, timed
             out, or an error response). The cause is logged, not returned.
@@ -120,6 +157,7 @@ async def search_words(db: AsyncSession, user_id: int, *, query: str, language: 
     provider = PROVIDERS.get(language)
     if provider is None:
         raise UnsupportedLanguageError(f"Unsupported language: {language}")
+    searches_left = await _count_search(db, user_id, language)
 
     try:
         results = await provider.fetch(query)
@@ -129,14 +167,70 @@ async def search_words(db: AsyncSession, user_id: int, *, query: str, language: 
     if results.is_empty:
         raise DefinitionNotFoundError("Word not found")
     if not results.words:
-        return results
+        return WordSearchResponse(
+            words=[],
+            suggestions=results.suggestions,
+            mock_queries=results.mock_queries,
+            searches_left=searches_left,
+        )
 
     uuids = [w.uuid for w in results.words if w.uuid]
     saved_uuids = await repository.get_saved_uuids(db, user_id, uuids)
     words = [WordOut.model_validate(w).model_copy(update={"saved": w.uuid in saved_uuids}) for w in results.words]
     searched = _comparable(query)
     words.sort(key=lambda w: _comparable(w.name) != searched)  # stable: ties keep their order
-    return SearchResult(words=words)
+    return WordSearchResponse(words=words, searches_left=searches_left)
+
+
+async def get_search_limits(db: AsyncSession, user_id: int) -> SearchLimits:
+    """The per-account search limit, and how many searches the user has left in each language.
+
+    Without a limit (`settings.searches_per_language` unset), both are None.
+    """
+    limit = settings.searches_per_language
+    if limit is None:
+        return SearchLimits(limit=None, searches_left={language: None for language in Language})
+    counts = await repository.get_search_counts(db, user_id)
+    return SearchLimits(
+        limit=limit,
+        searches_left={language: max(limit - counts.get(language, 0), 0) for language in Language},
+    )
+
+
+_LANGUAGE_NAMES = {Language.EN: "English", Language.ES: "Spanish"}
+
+
+async def _count_search(db: AsyncSession, user_id: int, language: str) -> int | None:
+    """Count a search against the limits that are set, and return the user's searches left.
+
+    Commits, so the counts' row locks aren't held while the dictionary is
+    called, and rolls back if a limit refuses the search, so a refused search
+    uses up nothing. Returns None without a per-account limit.
+
+    Raises:
+        SearchLimitReachedError: the user has no searches left in `language`.
+        DailySearchLimitReachedError: today's searches in `language` are used up.
+    """
+    per_account = settings.searches_per_language
+    per_day = settings.daily_searches_per_language
+    if per_account is None and per_day is None:
+        return None
+
+    searches_left = None
+    if per_account is not None:
+        count = await repository.add_search(db, user_id, language, limit=per_account)
+        if count is None:
+            raise SearchLimitReachedError(
+                f"You've used your {per_account} {_LANGUAGE_NAMES[language]} searches in this demo"
+            )
+        searches_left = per_account - count
+    if per_day is not None:
+        now = utc_day.now()
+        if await repository.add_daily_search(db, now.date(), language, limit=per_day) is None:
+            await db.rollback()  # the user's own count goes back too
+            raise DailySearchLimitReachedError(retry_after=utc_day.seconds_until_next_day(now))
+    await db.commit()
+    return searches_left
 
 
 # --------------------------------------------------------------------------- #
@@ -148,9 +242,14 @@ async def save_word(db: AsyncSession, user_id: int, payload: WordCreate) -> Word
     """Add `payload` to the user's vocabulary and return the stored word.
 
     Raises:
+        WordLimitReachedError: the user already has `settings.max_words_per_user`
+            words. A race of two saves can go one word over, which is fine.
         WordAlreadySavedError: the database rejected the insert as a
             duplicate. Nothing is stored and the session is rolled back.
     """
+    limit = settings.max_words_per_user
+    if limit is not None and await repository.count_words(db, user_id) >= limit:
+        raise WordLimitReachedError(f"You can save up to {limit} words in this demo")
     word = Word(
         user_id=user_id,
         uuid=payload.uuid,

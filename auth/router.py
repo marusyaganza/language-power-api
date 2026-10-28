@@ -21,6 +21,7 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 _STATUS_FOR_ERROR: dict[type[service.AuthError], int] = {
     service.SignupClosedError: status.HTTP_403_FORBIDDEN,
+    service.SignupClosedForTodayError: status.HTTP_429_TOO_MANY_REQUESTS,
     service.EmailAlreadyRegisteredError: status.HTTP_409_CONFLICT,
     service.InvalidCredentialsError: status.HTTP_401_UNAUTHORIZED,
     service.TooManyAttemptsError: status.HTTP_429_TOO_MANY_REQUESTS,
@@ -39,7 +40,7 @@ def _http_errors():
         yield
     except service.AuthError as exc:
         headers = None
-        if isinstance(exc, service.TooManyAttemptsError):
+        if isinstance(exc, (service.TooManyAttemptsError, service.SignupClosedForTodayError)):
             headers = {"Retry-After": str(exc.retry_after)}
         raise HTTPException(
             status_code=_STATUS_FOR_ERROR.get(type(exc), status.HTTP_500_INTERNAL_SERVER_ERROR),
@@ -57,7 +58,8 @@ async def signup(
     """Create an account and log in.
 
     403 if signups are closed, 409 if the email is taken, 429 (with
-    `Retry-After`) after too many signups.
+    `Retry-After`) after too many signups, or when today's new accounts are
+    all taken.
     """
     with _http_errors():
         result = await service.signup(db, user_in)
@@ -95,10 +97,15 @@ async def logout(
 
 
 @auth_router.get("/config")
-async def auth_config():
-    """Public settings the frontend needs before anyone is logged in."""
+async def auth_config(db: AsyncSession = Depends(get_db)):
+    """Public settings the frontend needs before anyone is logged in.
+
+    `signup_open_today` is false when signups are off or today's new accounts
+    are all taken.
+    """
     return {
         "signup_enabled": service.signups_open(),
+        "signup_open_today": await service.signup_open_today(db),
         "use_mocks": service.mocks_enabled(),
     }
 

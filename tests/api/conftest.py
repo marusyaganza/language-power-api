@@ -111,6 +111,8 @@ async def make_client(db, redis, monkeypatch):
     monkeypatch.setattr(
         auth.service, "_signup_limiter", AttemptLimiter(settings.signup_limit, settings.signup_window_seconds)
     )
+    # The day's signup count is cached in the process too.
+    monkeypatch.setattr(auth.service, "_signups_today", auth.service._DailyCount())
 
     async def _get_db():
         yield db

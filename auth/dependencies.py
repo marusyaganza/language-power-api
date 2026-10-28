@@ -27,7 +27,8 @@ async def get_current_user(
 
     Raises:
         HTTPException: 401 if there is no cookie, the session is unknown or
-            expired, or its user no longer exists. These cases are not
+            expired, or its user no longer exists or has expired
+            (`auth.service.account_expired`). These cases are not
             distinguished, so a caller learns nothing about which sessions
             exist.
     """
@@ -41,8 +42,9 @@ async def get_current_user(
     await auth_service.refresh_session_if_needed(session_id)
 
     user = await users_service.get_user_by_id(db, user_id)
-    if user is None:
-        # The session points at a user that was deleted.
+    if user is None or auth_service.account_expired(user):
+        # The session points at a user that was deleted, or whose account has
+        # expired and is about to be.
         raise _not_authenticated()
 
     return user

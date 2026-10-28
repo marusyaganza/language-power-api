@@ -149,3 +149,10 @@ class WordSearchResponse(BaseModel):
     suggestions: list[str] = []  # spelling suggestions from the dictionary
     # Mock mode only, when the query has no mock data: the queries that do.
     mock_queries: list[str] = []
+    # Searches the user has left in this language; None: no limit.
+    searches_left: int | None = None
+
+
+class SearchLimits(BaseModel):
+    limit: int | None  # searches per language for an account; None: no limit
+    searches_left: dict[Language, int | None]

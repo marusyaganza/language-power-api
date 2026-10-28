@@ -1,6 +1,6 @@
 from typing import Self
 
-from pydantic import SecretStr, model_validator
+from pydantic import PositiveInt, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,6 +40,19 @@ class Settings(BaseSettings):
     # All signups together, from anyone: only matters where signup is open.
     signup_limit: int = 30
     signup_window_seconds: int = 60 * 60
+
+    # Limits for a public deployment, where strangers sign up. Unset (the
+    # default) turns each one off. Days are UTC days.
+    # Dictionary searches per language: per account, and per day for everyone
+    # together (Merriam-Webster's free plan allows 1,000 a day per dictionary).
+    searches_per_language: PositiveInt | None = None
+    daily_searches_per_language: PositiveInt | None = None
+    # New accounts per day.
+    daily_signup_limit: PositiveInt | None = None
+    # Accounts older than this are logged out, and deleted at the next signup.
+    account_ttl_hours: PositiveInt | None = None
+    # Saved words per account.
+    max_words_per_user: PositiveInt | None = None
 
     # Error reporting (core.sentry). No DSN: nothing is sent.
     sentry_dsn: SecretStr | None = None

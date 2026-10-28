@@ -13,18 +13,22 @@ Rules that apply to every function below:
   asyncio client (`redis.asyncio.Redis`).
 
 Logins and signups are rate-limited in memory (`auth.rate_limit`, limits in
-`settings`): logins per email, signups all together.
+`settings`): logins per email, signups all together. Where they are set,
+`settings.daily_signup_limit` caps new accounts per UTC day, and
+`settings.account_ttl_hours` limits how long an account lives.
 """
 
 import asyncio
 import math
 import secrets
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.rate_limit import AttemptLimiter
 from auth.schemas import LoginRequest, UserCreate
+from core import utc_day
 from core.redis import redis_client
 from settings import settings
 from users import service as users_service
@@ -33,12 +37,15 @@ from users.models import User
 __all__ = [
     "AuthError",
     "SignupClosedError",
+    "SignupClosedForTodayError",
     "EmailAlreadyRegisteredError",
     "InvalidCredentialsError",
     "TooManyAttemptsError",
     "AuthResult",
     "signups_open",
+    "signup_open_today",
     "mocks_enabled",
+    "account_expired",
     "signup",
     "login",
     "create_session",
@@ -59,6 +66,14 @@ class AuthError(Exception):
 
 class SignupClosedError(AuthError):
     """New accounts cannot be created right now."""
+
+
+class SignupClosedForTodayError(AuthError):
+    """Today's new accounts are all taken; `retry_after` is the whole seconds until the next UTC day."""
+
+    def __init__(self, retry_after: int):
+        super().__init__("Sorry, registration is closed for today, try again tomorrow")
+        self.retry_after = retry_after
 
 
 class EmailAlreadyRegisteredError(AuthError):
@@ -88,6 +103,27 @@ _signup_limiter = AttemptLimiter(settings.signup_limit, settings.signup_window_s
 _SIGNUP_KEY = "signup"
 
 
+@dataclass
+class _DailyCount:
+    day: date | None = None
+    count: int = 0
+
+
+# Accounts created today (UTC), for `settings.daily_signup_limit`. Read from
+# the database once a day, then counted here: `/auth/config` asks for it on
+# every call, including the uptime check's, and a query each time would keep
+# the database from ever going idle. Exact because there is one instance.
+_signups_today = _DailyCount()
+
+
+async def _count_signups_today(db: AsyncSession, now: datetime) -> int:
+    today = now.date()
+    if _signups_today.day != today:
+        count = await users_service.count_users_created_since(db, utc_day.start_of_day(now))
+        _signups_today.day, _signups_today.count = today, count
+    return _signups_today.count
+
+
 def _count_attempt(limiter: AttemptLimiter, key: str) -> None:
     """Count an attempt, or raise TooManyAttemptsError if the limit is reached."""
     wait = limiter.acquire(key)
@@ -108,6 +144,20 @@ def signups_open() -> bool:
     return settings.signup_enabled
 
 
+async def signup_open_today(db: AsyncSession) -> bool:
+    """Whether signups are open and today's limit (`daily_signup_limit`), if any, isn't reached."""
+    if not signups_open():
+        return False
+    limit = settings.daily_signup_limit
+    return limit is None or await _count_signups_today(db, utc_day.now()) < limit
+
+
+def account_expired(user: User) -> bool:
+    """Whether the account is older than `settings.account_ttl_hours` (never, if unset)."""
+    ttl = settings.account_ttl_hours
+    return ttl is not None and user.created_at is not None and user.created_at <= utc_day.now() - timedelta(hours=ttl)
+
+
 def mocks_enabled() -> bool:
     """Whether dictionary lookups use mock data (the `use_mocks` setting)."""
     return settings.use_mocks
@@ -121,16 +171,27 @@ async def signup(db: AsyncSession, user_in: UserCreate) -> AuthResult:
     rejects the second insert, and that is reported the same way.
 
     Every attempt while signups are open counts toward the signup limit,
-    including one for a taken email.
+    including one for a taken email. Accounts older than
+    `settings.account_ttl_hours` are deleted first, so a new account never
+    meets an expired one with the same email.
 
     Raises:
         SignupClosedError: signups are turned off.
+        SignupClosedForTodayError: today's new accounts are all taken.
+            Checked before anything else; two signups at once can go one
+            account over, which is fine.
         TooManyAttemptsError: too many signups recently, from anyone.
         EmailAlreadyRegisteredError: the email belongs to an existing account.
     """
     if not signups_open():
         raise SignupClosedError("Signups are currently closed")
+    now = utc_day.now()
+    limit = settings.daily_signup_limit
+    if limit is not None and await _count_signups_today(db, now) >= limit:
+        raise SignupClosedForTodayError(retry_after=utc_day.seconds_until_next_day(now))
     _count_attempt(_signup_limiter, _SIGNUP_KEY)
+    if settings.account_ttl_hours is not None:
+        await users_service.delete_users_created_before(db, now - timedelta(hours=settings.account_ttl_hours))
 
     if await users_service.get_user_by_email(db, user_in.email) is not None:
         raise EmailAlreadyRegisteredError("Email already registered")
@@ -139,6 +200,8 @@ async def signup(db: AsyncSession, user_in: UserCreate) -> AuthResult:
         user = await users_service.create_user(db, user_in)
     except users_service.EmailTakenError as exc:
         raise EmailAlreadyRegisteredError("Email already registered") from exc
+    if _signups_today.day == now.date():
+        _signups_today.count += 1
     return AuthResult(user=user, session_id=await create_session(user.id))
 
 
@@ -155,6 +218,8 @@ async def login(db: AsyncSession, credentials: LoginRequest) -> AuthResult:
     database lookup and bcrypt, so a refused attempt costs nothing, and a
     successful login starts it over.
 
+    An expired account (`account_expired`) is treated like an unknown email.
+
     Raises:
         TooManyAttemptsError: too many attempts for this email recently,
             even if the password is right.
@@ -164,8 +229,10 @@ async def login(db: AsyncSession, credentials: LoginRequest) -> AuthResult:
     user = await users_service.get_user_by_email(db, credentials.email)
     # Password hashing is slow on purpose, so it runs in a thread to keep it
     # from stalling every other request on the event loop.
-    if user is None or not await asyncio.to_thread(
-        users_service.verify_password, credentials.password, user.hashed_password
+    if (
+        user is None
+        or account_expired(user)
+        or not await asyncio.to_thread(users_service.verify_password, credentials.password, user.hashed_password)
     ):
         raise InvalidCredentialsError("Incorrect email or password")
 

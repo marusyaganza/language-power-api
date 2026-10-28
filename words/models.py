@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, UniqueConstraint, false
@@ -55,3 +55,23 @@ class Example(Base):
     translation: Mapped[str | None]
 
     word: Mapped["Word"] = relationship(back_populates="examples", lazy="raise")
+
+
+class SearchCount(Base):
+    """Dictionary searches an account has made in a language (`searches_per_language`)."""
+
+    __tablename__ = "search_counts"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    language: Mapped[str] = mapped_column(primary_key=True)
+    count: Mapped[int]
+
+
+class DailySearchCount(Base):
+    """Dictionary searches made by everyone in a language on a UTC day (`daily_searches_per_language`)."""
+
+    __tablename__ = "daily_search_counts"
+
+    day: Mapped[date] = mapped_column(primary_key=True)
+    language: Mapped[str] = mapped_column(primary_key=True)
+    count: Mapped[int]

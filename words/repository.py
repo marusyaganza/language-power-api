@@ -1,10 +1,13 @@
 """Queries on the words tables. Never commits; callers own the transaction."""
 
+from datetime import date
+
 from sqlalchemy import Row, func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from words.models import Word
+from words.models import DailySearchCount, SearchCount, Word
 from words.schemas import SortOrder, VocabularySortBy
 
 # Order used for each sort field when the caller does not choose one.
@@ -95,3 +98,48 @@ async def get_words_by_ids(db: AsyncSession, user_id: int, word_ids: list[int]) 
         select(Word).options(selectinload(Word.examples)).where(Word.user_id == user_id, Word.id.in_(word_ids))
     )
     return list(result.all())
+
+
+async def count_words(db: AsyncSession, user_id: int) -> int:
+    """How many words the user has saved, in all languages."""
+    return await db.scalar(select(func.count()).select_from(Word).where(Word.user_id == user_id)) or 0
+
+
+async def add_search(db: AsyncSession, user_id: int, language: str, *, limit: int) -> int | None:
+    """Count one search by the user in `language`, unless `limit` is reached.
+
+    Returns the new count, or None if the count was already `limit` (then
+    nothing changes). One statement, so two requests at once can't both pass.
+    """
+    stmt = (
+        insert(SearchCount)
+        .values(user_id=user_id, language=language, count=1)
+        .on_conflict_do_update(
+            index_elements=[SearchCount.user_id, SearchCount.language],
+            set_={"count": SearchCount.count + 1},
+            where=SearchCount.count < limit,
+        )
+        .returning(SearchCount.count)
+    )
+    return await db.scalar(stmt)
+
+
+async def add_daily_search(db: AsyncSession, day: date, language: str, *, limit: int) -> int | None:
+    """Count one search in `language` on `day`, unless `limit` is reached; like `add_search`."""
+    stmt = (
+        insert(DailySearchCount)
+        .values(day=day, language=language, count=1)
+        .on_conflict_do_update(
+            index_elements=[DailySearchCount.day, DailySearchCount.language],
+            set_={"count": DailySearchCount.count + 1},
+            where=DailySearchCount.count < limit,
+        )
+        .returning(DailySearchCount.count)
+    )
+    return await db.scalar(stmt)
+
+
+async def get_search_counts(db: AsyncSession, user_id: int) -> dict[str, int]:
+    """The user's search count per language; languages never searched are missing."""
+    rows = await db.execute(select(SearchCount.language, SearchCount.count).where(SearchCount.user_id == user_id))
+    return {row.language: row.count for row in rows}

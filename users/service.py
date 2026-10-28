@@ -9,10 +9,11 @@ does) so they do not block the event loop.
 """
 
 import asyncio
+from datetime import datetime
 
 import bcrypt
 from psycopg.errors import UniqueViolation
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +30,8 @@ __all__ = [
     "create_user",
     "get_user_by_id",
     "get_user_by_email",
+    "count_users_created_since",
+    "delete_users_created_before",
 ]
 
 
@@ -92,3 +95,19 @@ async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
     lowercased, as `auth.schemas` does for every request.
     """
     return await db.scalar(select(User).where(User.email == email))
+
+
+async def count_users_created_since(db: AsyncSession, since: datetime) -> int:
+    """How many accounts were created at or after `since`."""
+    return await db.scalar(select(func.count()).select_from(User).where(User.created_at >= since)) or 0
+
+
+async def delete_users_created_before(db: AsyncSession, cutoff: datetime) -> int:
+    """Delete every account created before `cutoff`, with all its data, and commit.
+
+    The database deletes what the accounts own (ON DELETE CASCADE), so no
+    rows are loaded. Returns how many accounts were deleted.
+    """
+    result = await db.execute(delete(User).where(User.created_at < cutoff))
+    await db.commit()
+    return result.rowcount

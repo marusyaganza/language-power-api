@@ -16,6 +16,7 @@ from core.language import Language
 from words import service
 from words.schemas import (
     MAX_QUERY_LENGTH,
+    SearchLimits,
     SortOrder,
     VocabularyPage,
     VocabularySortBy,
@@ -33,6 +34,9 @@ _STATUS_FOR_ERROR: dict[type[service.WordsError], int] = {
     service.DictionaryUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
     service.WordNotFoundError: status.HTTP_404_NOT_FOUND,
     service.WordAlreadySavedError: status.HTTP_409_CONFLICT,
+    service.SearchLimitReachedError: status.HTTP_429_TOO_MANY_REQUESTS,
+    service.DailySearchLimitReachedError: status.HTTP_429_TOO_MANY_REQUESTS,
+    service.WordLimitReachedError: status.HTTP_409_CONFLICT,
 }
 
 
@@ -42,13 +46,19 @@ def _http_errors():
 
     An error missing from `_STATUS_FOR_ERROR` becomes a 500, so a new error
     type added to the service is never silently reported as a client error.
+    When today's searches are used up, a `Retry-After` header says how long
+    until they start again.
     """
     try:
         yield
     except service.WordsError as exc:
+        headers = None
+        if isinstance(exc, service.DailySearchLimitReachedError):
+            headers = {"Retry-After": str(exc.retry_after)}
         raise HTTPException(
             status_code=_STATUS_FOR_ERROR.get(type(exc), status.HTTP_500_INTERNAL_SERVER_ERROR),
             detail=str(exc),
+            headers=headers,
         ) from exc
 
 
@@ -63,10 +73,21 @@ async def search_words(
 
     404 if the dictionary has no entry,
     503 if the dictionary itself failed (worth retrying later).
-    Spelling suggestions are a normal 200 response.
+    Spelling suggestions are a normal 200 response. Where searches are
+    limited: 429 when the user has none left in this language, or (with
+    `Retry-After`) when today's searches are used up for everyone.
     """
     with _http_errors():
         return await service.search_words(db, current_user.id, query=query, language=language)
+
+
+@router.get("/search-limits", response_model=SearchLimits)
+async def get_search_limits(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """The searches the user has left in each language; all None where searches aren't limited."""
+    return await service.get_search_limits(db, current_user.id)
 
 
 @router.post("/save", response_model=WordOut, status_code=status.HTTP_201_CREATED)
@@ -75,7 +96,10 @@ async def create_word(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Save a word to the user's vocabulary. 409 if it is already saved."""
+    """Save a word to the user's vocabulary.
+
+    409 if it is already saved, or the account has all the words it may have.
+    """
     with _http_errors():
         return await service.save_word(db, current_user.id, payload)
 

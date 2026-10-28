@@ -21,7 +21,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     email: Mapped[str] = mapped_column(unique=True, index=True)
     hashed_password: Mapped[str]
-    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Indexed for the daily signup count and deleting expired accounts.
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # passive_deletes: the database deletes a user's words (ON DELETE CASCADE),
     # so deleting a user doesn't load thousands of words just to delete them.
