@@ -180,6 +180,16 @@ def test_the_name_is_the_headword(provider_class, monkeypatch, meta_id, headword
     assert word.name == name
 
 
+@pytest.mark.parametrize("provider_class", PROVIDERS)
+@pytest.mark.parametrize(("label", "offensive"), [(True, True), (False, False), (None, False)])
+def test_the_offensive_label_is_read_from_meta(provider_class, monkeypatch, label, offensive):
+    raw = entry("casa")
+    if label is not None:
+        raw["meta"]["offensive"] = label
+    [word] = search(provider_class, monkeypatch, [raw]).words
+    assert word.offensive is offensive
+
+
 # Regression: MW's Spanish dictionary is bilingual, and English headwords
 # were saved as Spanish words with a broken audio URL.
 def test_spanish_search_keeps_only_spanish_headwords(monkeypatch):

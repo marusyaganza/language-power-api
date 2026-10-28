@@ -164,6 +164,7 @@ async def save_word(db: AsyncSession, user_id: int, payload: WordCreate) -> Word
         img_url=payload.img_url,
         img_desc=payload.img_desc,
         gender=payload.gender,
+        offensive=payload.offensive,
         examples=_to_examples(payload.examples),
     )
     db.add(word)

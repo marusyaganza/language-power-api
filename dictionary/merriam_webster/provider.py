@@ -56,5 +56,6 @@ class MerriamWebsterProvider(DictionaryProvider):
             defs=unique_definitions(extract_definitions(entry)),
             audio_url=extract_audio(entry, self.language, self.audio_country),
             examples=extract_examples(entry),
+            offensive=meta.get("offensive") is True,
             **self._extra_fields(entry),
         )

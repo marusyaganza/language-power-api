@@ -23,6 +23,13 @@ async def test_saved_word_comes_back_with_examples(client):
     assert page["items"][0]["examples"] == [EXAMPLE]
 
 
+async def test_the_offensive_label_is_saved(client):
+    saved = await save_word(client, "casa", offensive=True)
+    assert saved["offensive"] is True
+    plain = await save_word(client, "mesa")
+    assert plain["offensive"] is False
+
+
 async def test_saving_the_same_word_twice_conflicts(client):
     await save_word(client, "casa")
     response = await client.post(

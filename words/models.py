@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, UniqueConstraint, false
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -35,6 +35,7 @@ class Word(Base):
     img_url: Mapped[str | None]
     img_desc: Mapped[str | None]  # caption of img_url
     gender: Mapped[str | None]  # "masculine" | "feminine" | "both" | None
+    offensive: Mapped[bool] = mapped_column(default=False, server_default=false())  # dictionary label
 
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

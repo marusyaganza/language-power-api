@@ -23,6 +23,8 @@ class DictionaryEntry:
     * `fl`: the part of speech, shown as is.
     * `stems`: forms of the word, used to hide it in hints; may be empty.
     * `gender`: only for languages with grammatical gender.
+    * `offensive`: the dictionary labels the word offensive. Such words are
+      shown with the label, never hidden.
     """
 
     uuid: str
@@ -37,6 +39,7 @@ class DictionaryEntry:
     img_desc: str | None = None  # caption of img_url
     examples: list[DictionaryExample] = field(default_factory=list)
     gender: str | None = None  # "masculine" | "feminine" | "both" | None
+    offensive: bool = False
 
 
 def unique_definitions(defs: list[str]) -> list[str]:

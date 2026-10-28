@@ -37,6 +37,7 @@ class WordCreate(BaseModel):
     img_url: OptionalStr = None
     img_desc: OptionalStr = None
     gender: OptionalGender = None
+    offensive: bool = False
     examples: list[ExampleItem] = []
 
     @field_validator("defs")
@@ -63,6 +64,7 @@ class WordOut(BaseModel):
     examples: list[ExampleItem]
     saved: bool = False
     gender: Gender | None = None
+    offensive: bool = False
 
     model_config = {"from_attributes": True}
 
