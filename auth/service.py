@@ -13,7 +13,9 @@ Rules that apply to every function below:
   asyncio client (`redis.asyncio.Redis`).
 
 Logins and signups are rate-limited in memory (`auth.rate_limit`, limits in
-`settings`): logins per email, signups all together. Where they are set,
+`settings`): logins per email, signups all together. Where the caller's IP is
+known (`core.proxy_signature.client_ip`), logins are counted per IP and email
+instead, and each IP also has its own login and signup limits. Where they are set,
 `settings.daily_signup_limit` caps new accounts per UTC day, and
 `settings.account_ttl_hours` limits how long an account lives.
 """
@@ -98,6 +100,8 @@ class TooManyAttemptsError(AuthError):
 
 _login_limiter = AttemptLimiter(settings.login_attempt_limit, settings.login_attempt_window_seconds)
 _signup_limiter = AttemptLimiter(settings.signup_limit, settings.signup_window_seconds)
+_login_ip_limiter = AttemptLimiter(settings.login_ip_limit, settings.login_attempt_window_seconds)
+_signup_ip_limiter = AttemptLimiter(settings.signup_ip_limit, settings.signup_window_seconds)
 # Every signup shares one count: the limit is on new accounts overall, and
 # needs nothing from the request that a caller could vary.
 _SIGNUP_KEY = "signup"
@@ -163,15 +167,16 @@ def mocks_enabled() -> bool:
     return settings.use_mocks
 
 
-async def signup(db: AsyncSession, user_in: UserCreate) -> AuthResult:
+async def signup(db: AsyncSession, user_in: UserCreate, *, client_ip: str | None = None) -> AuthResult:
     """Create an account and start a session for it.
 
     The email check below is only the fast path: two simultaneous signups
     with the same email can both pass it. The database's unique index then
     rejects the second insert, and that is reported the same way.
 
-    Every attempt while signups are open counts toward the signup limit,
-    including one for a taken email. Accounts older than
+    Every attempt while signups are open counts toward the signup limits
+    (the IP's, if `client_ip` is known, then everyone's), including one for
+    a taken email. Accounts older than
     `settings.account_ttl_hours` are deleted first, so a new account never
     meets an expired one with the same email.
 
@@ -180,7 +185,8 @@ async def signup(db: AsyncSession, user_in: UserCreate) -> AuthResult:
         SignupClosedForTodayError: today's new accounts are all taken.
             Checked before anything else; two signups at once can go one
             account over, which is fine.
-        TooManyAttemptsError: too many signups recently, from anyone.
+        TooManyAttemptsError: too many signups recently, from this IP or
+            from anyone.
         EmailAlreadyRegisteredError: the email belongs to an existing account.
     """
     if not signups_open():
@@ -189,6 +195,8 @@ async def signup(db: AsyncSession, user_in: UserCreate) -> AuthResult:
     limit = settings.daily_signup_limit
     if limit is not None and await _count_signups_today(db, now) >= limit:
         raise SignupClosedForTodayError(retry_after=utc_day.seconds_until_next_day(now))
+    if client_ip is not None:
+        _count_attempt(_signup_ip_limiter, client_ip)
     _count_attempt(_signup_limiter, _SIGNUP_KEY)
     if settings.account_ttl_hours is not None:
         await users_service.delete_users_created_before(db, now - timedelta(hours=settings.account_ttl_hours))
@@ -205,7 +213,7 @@ async def signup(db: AsyncSession, user_in: UserCreate) -> AuthResult:
     return AuthResult(user=user, session_id=await create_session(user.id))
 
 
-async def login(db: AsyncSession, credentials: LoginRequest) -> AuthResult:
+async def login(db: AsyncSession, credentials: LoginRequest, *, client_ip: str | None = None) -> AuthResult:
     """Check an email and password and start a session for the matching user.
 
     An unknown email and a wrong password raise the same error, so the
@@ -218,14 +226,22 @@ async def login(db: AsyncSession, credentials: LoginRequest) -> AuthResult:
     database lookup and bcrypt, so a refused attempt costs nothing, and a
     successful login starts it over.
 
+    With `client_ip`, the email's limit is counted per IP, so nobody can
+    lock someone else out of their account from elsewhere, and all of the
+    IP's attempts together have a limit too, so one IP can't try many emails
+    (or fill the limiter's table of emails).
+
     An expired account (`account_expired`) is treated like an unknown email.
 
     Raises:
-        TooManyAttemptsError: too many attempts for this email recently,
-            even if the password is right.
+        TooManyAttemptsError: too many attempts for this email (from this
+            IP) or from this IP recently, even if the password is right.
         InvalidCredentialsError: unknown email or wrong password.
     """
-    _count_attempt(_login_limiter, credentials.email)
+    if client_ip is not None:
+        _count_attempt(_login_ip_limiter, client_ip)
+    login_key = credentials.email if client_ip is None else f"{client_ip} {credentials.email}"
+    _count_attempt(_login_limiter, login_key)
     user = await users_service.get_user_by_email(db, credentials.email)
     # Password hashing is slow on purpose, so it runs in a thread to keep it
     # from stalling every other request on the event loop.
@@ -236,7 +252,7 @@ async def login(db: AsyncSession, credentials: LoginRequest) -> AuthResult:
     ):
         raise InvalidCredentialsError("Incorrect email or password")
 
-    _login_limiter.reset(credentials.email)
+    _login_limiter.reset(login_key)
     return AuthResult(user=user, session_id=await create_session(user.id))
 
 

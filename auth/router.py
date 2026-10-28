@@ -7,7 +7,7 @@ codes. What each operation does is documented on the service functions.
 
 from contextlib import contextmanager
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import service
@@ -15,6 +15,7 @@ from auth.dependencies import get_current_user
 from auth.helpers import clear_session_cookie, set_session_cookie
 from auth.schemas import LoginRequest, UserCreate, UserOut
 from core.database import get_db
+from core.proxy_signature import client_ip
 from users.models import User
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -52,17 +53,18 @@ def _http_errors():
 @auth_router.post("/signup", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def signup(
     user_in: UserCreate,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """Create an account and log in.
 
     403 if signups are closed, 409 if the email is taken, 429 (with
-    `Retry-After`) after too many signups, or when today's new accounts are
-    all taken.
+    `Retry-After`) after too many signups from this IP or from everyone, or
+    when today's new accounts are all taken.
     """
     with _http_errors():
-        result = await service.signup(db, user_in)
+        result = await service.signup(db, user_in, client_ip=client_ip(request))
     set_session_cookie(response, result.session_id)
     return result.user
 
@@ -70,16 +72,17 @@ async def signup(
 @auth_router.post("/login", response_model=UserOut)
 async def login(
     credentials: LoginRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """Log in with email and password.
 
     401 if either is wrong, 429 (with `Retry-After`) after too many attempts
-    for this email.
+    for this email, or from this IP.
     """
     with _http_errors():
-        result = await service.login(db, credentials)
+        result = await service.login(db, credentials, client_ip=client_ip(request))
     set_session_cookie(response, result.session_id)
     return result.user
 

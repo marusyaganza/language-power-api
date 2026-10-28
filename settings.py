@@ -40,6 +40,16 @@ class Settings(BaseSettings):
     # All signups together, from anyone: only matters where signup is open.
     signup_limit: int = 30
     signup_window_seconds: int = 60 * 60
+    # Per client IP, where the IP is known: behind the signed Netlify proxy
+    # (core.proxy_signature.client_ip), not locally. Logins are then counted
+    # per IP and email instead of per email, plus all of an IP's logins
+    # together. Signups and logins use the windows above.
+    signup_ip_limit: int = 5
+    login_ip_limit: int = 30
+    # Every request behind the proxy signature, checked before the session
+    # lookup, so a script can't use up the Redis command quota.
+    request_ip_limit: int = 300
+    request_ip_window_seconds: int = 5 * 60
 
     # Limits for a public deployment, where strangers sign up. Unset (the
     # default) turns each one off. Days are UTC days.

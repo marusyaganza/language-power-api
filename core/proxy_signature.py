@@ -8,7 +8,11 @@ call to the Cloud Run URL, and is rejected.
 
 The check is off while `settings.proxy_signature_secret` is unset, as in local
 development (the Vite dev proxy doesn't sign) and in tests.
+
+Netlify also tells the API who the visitor is (`client_ip`), for per-IP limits.
 """
+
+import ipaddress
 
 import jwt
 from fastapi import HTTPException, Request, status
@@ -17,6 +21,7 @@ from settings import settings
 
 SIGNATURE_HEADER = "x-nf-sign"
 NETLIFY_ISSUER = "netlify"
+CLIENT_IP_HEADER = "x-nf-client-connection-ip"
 
 
 async def require_proxy_signature(request: Request) -> None:
@@ -52,3 +57,29 @@ async def require_proxy_signature(request: Request) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Request did not come through the frontend proxy",
         ) from exc
+
+
+def client_ip(request: Request) -> str | None:
+    """The visitor's IP address as Netlify saw it, for per-IP limits; None where it isn't known.
+
+    Netlify sets `X-Nf-Client-Connection-Ip` on every request it forwards. The
+    header is only trusted while signatures are checked: without the check,
+    anyone can call the API directly and put any address in it. Never
+    `X-Forwarded-For`, which the client can partly write.
+
+    An IPv6 address becomes its /64 network, which usually belongs to one
+    home or device, so its owner can't get fresh limits by changing the last
+    bits. A value that isn't an address is used as it is.
+    """
+    if settings.proxy_signature_secret is None:
+        return None
+    value = request.headers.get(CLIENT_IP_HEADER)
+    if not value:
+        return None
+    try:
+        address = ipaddress.ip_address(value.strip())
+    except ValueError:
+        return value
+    if address.version == 6:
+        return str(ipaddress.ip_network((address, 64), strict=False))
+    return str(address)

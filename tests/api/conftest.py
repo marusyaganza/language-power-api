@@ -25,6 +25,7 @@ from sqlalchemy import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
+import auth.dependencies
 import auth.service
 import games.session_store
 from auth.rate_limit import AttemptLimiter
@@ -110,6 +111,19 @@ async def make_client(db, redis, monkeypatch):
     )
     monkeypatch.setattr(
         auth.service, "_signup_limiter", AttemptLimiter(settings.signup_limit, settings.signup_window_seconds)
+    )
+    monkeypatch.setattr(
+        auth.service,
+        "_login_ip_limiter",
+        AttemptLimiter(settings.login_ip_limit, settings.login_attempt_window_seconds),
+    )
+    monkeypatch.setattr(
+        auth.service, "_signup_ip_limiter", AttemptLimiter(settings.signup_ip_limit, settings.signup_window_seconds)
+    )
+    monkeypatch.setattr(
+        auth.dependencies,
+        "_request_limiter",
+        AttemptLimiter(settings.request_ip_limit, settings.request_ip_window_seconds),
     )
     # The day's signup count is cached in the process too.
     monkeypatch.setattr(auth.service, "_signups_today", auth.service._DailyCount())

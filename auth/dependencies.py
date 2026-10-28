@@ -1,12 +1,19 @@
-"""FastAPI dependencies for identifying the caller."""
+"""FastAPI dependencies for identifying and limiting the caller."""
 
-from fastapi import Cookie, Depends, HTTPException, status
+import math
+
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import service as auth_service
+from auth.rate_limit import AttemptLimiter
 from core.database import get_db
+from core.proxy_signature import client_ip
+from settings import settings
 from users import service as users_service
 from users.models import User
+
+_request_limiter = AttemptLimiter(settings.request_ip_limit, settings.request_ip_window_seconds)
 
 
 def _not_authenticated() -> HTTPException:
@@ -48,3 +55,26 @@ async def get_current_user(
         raise _not_authenticated()
 
     return user
+
+
+async def limit_requests_per_ip(request: Request) -> None:
+    """Refuse the request if its client IP has made too many recently.
+
+    For every route behind the proxy signature, after the signature check
+    (until then the IP can't be trusted) and before the session lookup, so a
+    script can't use up the Redis command quota or keep the instance busy.
+    Does nothing where the IP isn't known (`core.proxy_signature.client_ip`).
+
+    Raises:
+        HTTPException: 429 with `Retry-After`, the whole seconds to wait.
+    """
+    ip = client_ip(request)
+    if ip is None:
+        return
+    wait = _request_limiter.acquire(ip)
+    if wait is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests, try again later",
+            headers={"Retry-After": str(math.ceil(wait))},
+        )

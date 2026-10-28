@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from auth.dependencies import limit_requests_per_ip
 from auth.router import auth_router
 from core.database import engine
 from core.proxy_signature import require_proxy_signature
@@ -31,8 +32,10 @@ if settings.docs_enabled:
 else:
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
-# Every API route only answers requests from the frontend's proxy.
-_from_proxy = [Depends(require_proxy_signature)]
+# Every API route only answers requests from the frontend's proxy, and only so
+# many from one IP. In this order: the IP is only known once the signature is
+# checked, and route dependencies (the session lookup) run after these.
+_from_proxy = [Depends(require_proxy_signature), Depends(limit_requests_per_ip)]
 app.include_router(words_router, dependencies=_from_proxy)
 app.include_router(auth_router, dependencies=_from_proxy)
 app.include_router(games_router, dependencies=_from_proxy)
