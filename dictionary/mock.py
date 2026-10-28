@@ -8,8 +8,8 @@ provider's `_fetch_raw` answer, saved as it was received.
 import json
 from pathlib import Path
 
+from core.language import Language
 from dictionary.base import SearchResult
-from words.language import Language
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

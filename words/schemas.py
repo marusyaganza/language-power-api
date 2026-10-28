@@ -3,8 +3,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, Field, field_validator
 
+from core.language import Language
 from dictionary.entry import unique_definitions
-from words.language import Language
 
 
 def _empty_str_to_none(value):

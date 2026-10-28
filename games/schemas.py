@@ -4,9 +4,9 @@ from itertools import pairwise
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from core.language import Language
 from games.scoring import AnswerGrade
 from games.spaced_repetition import DEFAULT_CONFIG
-from words.language import Language
 from words.schemas import ExampleItem
 
 

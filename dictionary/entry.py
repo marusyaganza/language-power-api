@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 
-from words.language import Language
+from core.language import Language
 
 
 @dataclass(frozen=True)

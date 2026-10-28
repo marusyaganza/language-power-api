@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
+from core.language import Language
 from dictionary.entry import DictionaryEntry
-from words.language import Language
 
 
 @dataclass

@@ -1,7 +1,7 @@
+from core.language import Language
 from dictionary.merriam_webster.api import extract_image, extract_image_desc, extract_transcription
 from dictionary.merriam_webster.provider import MerriamWebsterProvider
 from settings import settings
-from words.language import Language
 
 # Merriam-Webster's Collegiate Dictionary (MW API docs).
 API_URL = "https://dictionaryapi.com/api/v3/references/collegiate/json"

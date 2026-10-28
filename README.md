@@ -56,7 +56,7 @@ Some rules hold everywhere:
 | --- | --- |
 | `main.py` | Creates the FastAPI app and includes the routers |
 | `settings.py` | All configuration, read from environment variables and `.env` |
-| `core/` | Database engine and session factory, Redis client |
+| `core/` | Database engine and session factory, Redis client, and the `Language` enum shared by every module |
 | `auth/` | Signup, login, logout, server-side sessions and the `get_current_user` dependency |
 | `users/` | User model, password hashing and user lookups |
 | `words/` | Dictionary search and the saved vocabulary |

@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import get_current_user
 from core.database import get_db
+from core.language import Language
 from words import service
-from words.language import Language
 from words.schemas import (
     SortOrder,
     VocabularyPage,

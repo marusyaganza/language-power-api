@@ -1,7 +1,7 @@
+from core.language import Language
 from dictionary.merriam_webster.api import extract_gender
 from dictionary.merriam_webster.provider import MerriamWebsterProvider
 from settings import settings
-from words.language import Language
 
 # Merriam-Webster's Spanish-English Dictionary (MW API docs). It has no
 # illustrations (no `art`), so entries never have an image.

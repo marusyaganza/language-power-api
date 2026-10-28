@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import get_current_user
 from core.database import get_db
+from core.language import Language
 from games import service
 from games.schemas import (
     AnswerRequest,
@@ -30,7 +31,6 @@ from games.schemas import (
     GameSettingsPreset,
     GameSettingsUpdate,
 )
-from words.language import Language
 
 router = APIRouter(prefix="/games", tags=["games"])
 # The settings belong to the logged-in user, hence /users/me rather than /games.
