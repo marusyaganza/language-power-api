@@ -4,11 +4,16 @@ from pydantic import ValidationError
 
 from auth.schemas import LoginRequest, UserCreate
 from games.schemas import GameSettingsUpdate
-from words.schemas import ExampleUpdate, WordCreate, WordUpdate
+from words import schemas
+from words.schemas import ExampleIn, WordCreate, WordUpdate
 
 
 def word_create(**fields):
     return WordCreate(**{"name": "casa", "language": "es", "fl": "noun", "defs": ["house"], **fields})
+
+
+def url(length):
+    return "https://" + "x" * (length - len("https://"))
 
 
 # --------------------------------------------------------------------------- #
@@ -19,7 +24,60 @@ def word_create(**fields):
 @pytest.mark.parametrize("translation", [None, "", "   "])
 def test_example_translation_can_be_missing(translation):
     # Regression: PATCH /words/{id} rejected null translations with a 422.
-    assert ExampleUpdate(text="mi casa", translation=translation).translation is None
+    assert ExampleIn(text="mi casa", translation=translation).translation is None
+
+
+# Each case: the limit, and the fields of a word that reaches a length or count n.
+SIZE_LIMITS = {
+    "name": (schemas.MAX_NAME_LENGTH, lambda n: {"name": "x" * n}),
+    "uuid": (schemas.MAX_UUID_LENGTH, lambda n: {"uuid": "x" * n}),
+    "fl": (schemas.MAX_FL_LENGTH, lambda n: {"fl": "x" * n}),
+    "transcription": (schemas.MAX_TRANSCRIPTION_LENGTH, lambda n: {"transcription": "x" * n}),
+    "img_desc": (schemas.MAX_IMG_DESC_LENGTH, lambda n: {"img_desc": "x" * n}),
+    "audio_url": (schemas.MAX_URL_LENGTH, lambda n: {"audio_url": url(n)}),
+    "img_url": (schemas.MAX_URL_LENGTH, lambda n: {"img_url": url(n)}),
+    "stem length": (schemas.MAX_STEM_LENGTH, lambda n: {"stems": ["x" * n]}),
+    "stem count": (schemas.MAX_STEMS, lambda n: {"stems": ["x"] * n}),
+    "definition length": (schemas.MAX_DEFINITION_LENGTH, lambda n: {"defs": ["x" * n]}),
+    "definition count": (schemas.MAX_DEFINITIONS, lambda n: {"defs": [f"d{i}" for i in range(n)]}),
+    "example length": (schemas.MAX_EXAMPLE_LENGTH, lambda n: {"examples": [{"text": "x" * n}]}),
+    "translation length": (
+        schemas.MAX_EXAMPLE_LENGTH,
+        lambda n: {"examples": [{"text": "x", "translation": "x" * n}]},
+    ),
+    "example count": (schemas.MAX_EXAMPLES, lambda n: {"examples": [{"text": "x"}] * n}),
+}
+
+
+@pytest.mark.parametrize(("limit", "fields"), SIZE_LIMITS.values(), ids=SIZE_LIMITS.keys())
+def test_word_create_accepts_the_limit_and_rejects_one_more(limit, fields):
+    word_create(**fields(limit))
+    with pytest.raises(ValidationError):
+        word_create(**fields(limit + 1))
+
+
+@pytest.mark.parametrize(
+    "case", ["definition length", "definition count", "example length", "example count", "audio_url", "img_url"]
+)
+def test_word_update_has_the_same_limits(case):
+    limit, fields = SIZE_LIMITS[case]
+    WordUpdate(**fields(limit))
+    with pytest.raises(ValidationError):
+        WordUpdate(**fields(limit + 1))
+
+
+@pytest.mark.parametrize("value", ["javascript:alert(1)", "data:image/png;base64,AAAA", "ftp://x/a.mp3", "/a.mp3"])
+@pytest.mark.parametrize("field", ["audio_url", "img_url"])
+def test_media_urls_must_be_http(field, value):
+    with pytest.raises(ValidationError):
+        word_create(**{field: value})
+    with pytest.raises(ValidationError):
+        WordUpdate(**{field: value})
+
+
+@pytest.mark.parametrize("value", ["https://a/x.mp3", "HTTP://a/x.mp3", "", None])
+def test_media_urls_accept_http_or_nothing(value):
+    assert word_create(audio_url=value, img_url=value).audio_url == (value or None)
 
 
 def test_definitions_are_stripped_and_repeats_dropped():

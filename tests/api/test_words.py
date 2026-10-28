@@ -5,6 +5,7 @@ from dictionary.base import DictionaryError, DictionaryProvider, SearchResult
 from dictionary.entry import DictionaryEntry
 from dictionary.providers import PROVIDERS
 from tests.api.conftest import save_word, signup
+from words.schemas import MAX_QUERY_LENGTH
 
 pytestmark = pytest.mark.anyio
 
@@ -188,6 +189,14 @@ async def test_search_without_mock_data_lists_the_queries_that_have_it(client):
     assert response.status_code == 200
     assert response.json()["words"] == []
     assert "heart" in response.json()["mock_queries"]
+
+
+async def test_search_texts_have_a_length_limit(client):
+    too_long = "x" * (MAX_QUERY_LENGTH + 1)
+    search = await client.get("/words/search", params={"query": too_long, "language": "en"})
+    vocabulary = await client.get("/words/vocabulary", params={"query": too_long, "language": "en"})
+    at_limit = await client.get("/words/vocabulary", params={"query": "x" * MAX_QUERY_LENGTH, "language": "en"})
+    assert [search.status_code, vocabulary.status_code, at_limit.status_code] == [422, 422, 200]
 
 
 async def test_an_unsupported_language_is_rejected_before_the_service(client):

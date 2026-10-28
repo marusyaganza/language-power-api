@@ -15,6 +15,7 @@ from core.database import get_db
 from core.language import Language
 from words import service
 from words.schemas import (
+    MAX_QUERY_LENGTH,
     SortOrder,
     VocabularyPage,
     VocabularySortBy,
@@ -53,8 +54,8 @@ def _http_errors():
 
 @router.get("/search", response_model=WordSearchResponse)
 async def search_words(
-    query: str,
-    language: Language,
+    query: str = Query(max_length=MAX_QUERY_LENGTH),
+    language: Language = Query(),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -82,7 +83,7 @@ async def create_word(
 @router.get("/vocabulary", response_model=VocabularyPage)
 async def list_vocabulary(
     language: Language,
-    query: str | None = Query(default=None),
+    query: str | None = Query(default=None, max_length=MAX_QUERY_LENGTH),
     page: int = Query(default=1, ge=1),
     sort_by: VocabularySortBy = Query(default=VocabularySortBy.created_at),
     sort_order: SortOrder | None = Query(default=None),
