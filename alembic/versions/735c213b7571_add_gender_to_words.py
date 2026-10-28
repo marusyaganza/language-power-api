@@ -1,4 +1,4 @@
-"""add games and game_languages tables
+"""add gender to words
 
 Revision ID: 735c213b7571
 Revises: 5c4e987b8b65

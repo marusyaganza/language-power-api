@@ -24,7 +24,7 @@ from words.schemas import (
     WordUpdate,
 )
 
-router = APIRouter(dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/words", tags=["words"])
 
 _STATUS_FOR_ERROR: dict[type[service.WordsError], int] = {
     service.UnsupportedLanguageError: status.HTTP_400_BAD_REQUEST,
@@ -51,7 +51,7 @@ def _http_errors():
         ) from exc
 
 
-@router.get("/words/search", response_model=WordSearchResponse)
+@router.get("/search", response_model=WordSearchResponse)
 async def search_words(
     query: str,
     language: Language,
@@ -68,7 +68,7 @@ async def search_words(
         return await service.search_words(db, current_user.id, query=query, language=language)
 
 
-@router.post("/words/save", response_model=WordOut, status_code=status.HTTP_201_CREATED)
+@router.post("/save", response_model=WordOut, status_code=status.HTTP_201_CREATED)
 async def create_word(
     payload: WordCreate,
     db: AsyncSession = Depends(get_db),
@@ -79,7 +79,7 @@ async def create_word(
         return await service.save_word(db, current_user.id, payload)
 
 
-@router.get("/words/vocabulary", response_model=VocabularyPage)
+@router.get("/vocabulary", response_model=VocabularyPage)
 async def list_vocabulary(
     language: Language,
     query: str | None = Query(default=None),
@@ -105,7 +105,7 @@ async def list_vocabulary(
         )
 
 
-@router.patch("/words/{word_id}", response_model=WordOut)
+@router.patch("/{word_id}", response_model=WordOut)
 async def edit_word(
     word_id: int,
     payload: WordUpdate,
@@ -117,7 +117,7 @@ async def edit_word(
         return await service.update_word(db, current_user.id, word_id, payload)
 
 
-@router.delete("/words/{word_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{word_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_word(
     word_id: int,
     db: AsyncSession = Depends(get_db),

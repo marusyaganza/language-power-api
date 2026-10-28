@@ -1,8 +1,13 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from auth.router import auth_router
+from core.database import engine
 from core.proxy_signature import require_proxy_signature
+from core.redis import redis_client
 from core.sentry import init_sentry
 from games.router import router as games_router
 from games.router import settings_router as game_settings_router
@@ -13,10 +18,18 @@ from words.router import router as words_router
 init_sentry(settings)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """On shutdown, close the Redis connections and the database pool."""
+    yield
+    await redis_client.aclose()
+    await engine.dispose()
+
+
 if settings.docs_enabled:
-    app = FastAPI()
+    app = FastAPI(lifespan=lifespan)
 else:
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
 # Every API route only answers requests from the frontend's proxy.
 _from_proxy = [Depends(require_proxy_signature)]
