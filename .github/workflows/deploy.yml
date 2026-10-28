@@ -2,11 +2,12 @@
 # choosing the branch and the target. See notes for the one-time setup.
 #
 # Each target has its own Google Cloud project. Its identifiers live in
-# repository variables named <PREFIX>_..., e.g. PERSONAL_GCP_PROJECT_ID, and its
-# non-secret settings in deploy/<target>.env.yaml. Nothing here is secret: Google
-# trusts this workflow through Workload Identity Federation, not a stored key.
-# It trusts it by its name, "Deploy" (Workload Identity binding of the
-# deployer account); renaming it means updating that binding too.
+# repository variables named <PREFIX>_..., e.g. PERSONAL_GCP_PROJECT_ID, its
+# non-secret settings in deploy/<target>.env.yaml, and its secrets in its own
+# project's Secret Manager (listed in "Deploy to Cloud Run"). Nothing here is
+# secret: Google trusts this workflow through Workload Identity Federation, not
+# a stored key. It trusts it by its name, "Deploy" (Workload Identity binding of
+# the deployer account); renaming it means updating that binding too.
 name: Deploy
 
 on:
@@ -17,6 +18,7 @@ on:
         type: choice
         options:
           - personal
+          - demo
         required: true
 
 permissions:
@@ -41,14 +43,15 @@ jobs:
 
     env:
       TARGET: ${{ inputs.target }}
-      # Add a line per target here when one is added to `options` above.
-      GCP_PROJECT_ID: ${{ inputs.target == 'personal' && vars.PERSONAL_GCP_PROJECT_ID || '' }}
-      GCP_REGION: ${{ inputs.target == 'personal' && vars.PERSONAL_GCP_REGION || '' }}
-      GCP_WIF_PROVIDER: ${{ inputs.target == 'personal' && vars.PERSONAL_GCP_WIF_PROVIDER || '' }}
-      GCP_DEPLOYER_SA: ${{ inputs.target == 'personal' && vars.PERSONAL_GCP_DEPLOYER_SA || '' }}
-      GCP_RUNTIME_SA: ${{ inputs.target == 'personal' && vars.PERSONAL_GCP_RUNTIME_SA || '' }}
-      SERVICE_NAME: ${{ inputs.target == 'personal' && vars.PERSONAL_SERVICE_NAME || '' }}
-      ARTIFACT_REPOSITORY: ${{ inputs.target == 'personal' && vars.PERSONAL_ARTIFACT_REPOSITORY || '' }}
+      # Each line picks the variable of the chosen target. A target added to
+      # `options` above needs its own `inputs.target == '...' && vars...` part.
+      GCP_PROJECT_ID: ${{ inputs.target == 'personal' && vars.PERSONAL_GCP_PROJECT_ID || inputs.target == 'demo' && vars.DEMO_GCP_PROJECT_ID || '' }}
+      GCP_REGION: ${{ inputs.target == 'personal' && vars.PERSONAL_GCP_REGION || inputs.target == 'demo' && vars.DEMO_GCP_REGION || '' }}
+      GCP_WIF_PROVIDER: ${{ inputs.target == 'personal' && vars.PERSONAL_GCP_WIF_PROVIDER || inputs.target == 'demo' && vars.DEMO_GCP_WIF_PROVIDER || '' }}
+      GCP_DEPLOYER_SA: ${{ inputs.target == 'personal' && vars.PERSONAL_GCP_DEPLOYER_SA || inputs.target == 'demo' && vars.DEMO_GCP_DEPLOYER_SA || '' }}
+      GCP_RUNTIME_SA: ${{ inputs.target == 'personal' && vars.PERSONAL_GCP_RUNTIME_SA || inputs.target == 'demo' && vars.DEMO_GCP_RUNTIME_SA || '' }}
+      SERVICE_NAME: ${{ inputs.target == 'personal' && vars.PERSONAL_SERVICE_NAME || inputs.target == 'demo' && vars.DEMO_SERVICE_NAME || '' }}
+      ARTIFACT_REPOSITORY: ${{ inputs.target == 'personal' && vars.PERSONAL_ARTIFACT_REPOSITORY || inputs.target == 'demo' && vars.DEMO_ARTIFACT_REPOSITORY || '' }}
 
     steps:
       - name: Check the target's variables are set
@@ -87,6 +90,18 @@ jobs:
       # Public access (allUsers may invoke) was granted once by hand and stays.
       - name: Deploy to Cloud Run
         run: |
+          # Secret Manager secrets of the target's project, each exposed as the
+          # env var of the same name. --set-secrets replaces the whole set, so
+          # a secret left out here is removed from the new revision.
+          SECRETS="DATABASE_URL REDIS_URL ENGLISH_API_KEY SPANISH_API_KEY PROXY_SIGNATURE_SECRET"
+          case "$TARGET" in
+            demo) SECRETS="$SECRETS SENTRY_DSN" ;;  # only the demo reports to Sentry
+          esac
+          SET_SECRETS=""
+          for name in $SECRETS; do
+            SET_SECRETS="$SET_SECRETS,$name=$name:latest"
+          done
+
           gcloud run deploy "$SERVICE_NAME" \
             --image "$IMAGE" \
             --project "$GCP_PROJECT_ID" \
@@ -99,7 +114,7 @@ jobs:
             --cpu-boost \
             --timeout 60 \
             --env-vars-file "deploy/$TARGET.env.yaml" \
-            --set-secrets "DATABASE_URL=DATABASE_URL:latest,REDIS_URL=REDIS_URL:latest,ENGLISH_API_KEY=ENGLISH_API_KEY:latest,SPANISH_API_KEY=SPANISH_API_KEY:latest,PROXY_SIGNATURE_SECRET=PROXY_SIGNATURE_SECRET:latest,SENTRY_DSN=SENTRY_DSN:latest" \
+            --set-secrets "${SET_SECRETS#,}" \
             --labels "commit=${GITHUB_SHA::12}" \
             --quiet
 
