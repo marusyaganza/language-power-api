@@ -5,6 +5,8 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -15,12 +17,19 @@ from tests.api.conftest import signup
 
 pytestmark = pytest.mark.anyio
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+# What `_app_built_with` reports on. Only a test's own values count, never the shell's.
+_DESCRIBED_SETTINGS = ("DOCS_ENABLED", "CORS_ORIGINS", "ROOT_PATH")
+
 
 def _app_built_with(**env: str) -> dict:
     """Import `main` in a fresh interpreter with extra env vars; describe the app.
 
     The app reads these settings once, when `main` is imported, so they cannot
-    be changed for an app that already exists.
+    be changed for an app that already exists. The interpreter starts in an
+    empty directory, so a developer's `.env` (read from the working directory)
+    isn't loaded, and the described settings are dropped from the inherited
+    environment: without `env`, the app gets the real defaults.
     """
     script = (
         "import json, main\n"
@@ -30,13 +39,16 @@ def _app_built_with(**env: str) -> dict:
         "    'root_path': main.app.root_path,\n"
         "}))\n"
     )
-    result = subprocess.run(
-        [sys.executable, "-c", script],
-        env={**os.environ, **env},
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    inherited = {k: v for k, v in os.environ.items() if k not in _DESCRIBED_SETTINGS}
+    with tempfile.TemporaryDirectory() as empty_dir:
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=empty_dir,
+            env={**inherited, "PYTHONPATH": str(REPO_ROOT), **env},
+            capture_output=True,
+            text=True,
+            check=True,
+        )
     return json.loads(result.stdout)
 
 

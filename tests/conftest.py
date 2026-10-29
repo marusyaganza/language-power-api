@@ -27,6 +27,8 @@ os.environ.update(
         "SENTRY_DSN": "",
         # URLs as the app builds them without a proxy, even with a ROOT_PATH in `.env`.
         "ROOT_PATH": "",
+        # Tests read /docs and /openapi.json, even with DOCS_ENABLED=false in `.env`.
+        "DOCS_ENABLED": "true",
     }
 )
 
