@@ -1,8 +1,8 @@
 # py-lp
 
-[![CI](https://github.com/marusyaganza/py-lp/actions/workflows/ci.yml/badge.svg)](https://github.com/marusyaganza/py-lp/actions/workflows/ci.yml)
+[![CI](https://github.com/marusyaganza/language-power-api/actions/workflows/ci.yml/badge.svg)](https://github.com/marusyaganza/language-power-api/actions/workflows/ci.yml)
 
-Third version of the Language Power application: a vocabulary trainer for English and Spanish. This repository is its backend, a FastAPI service with PostgreSQL, Redis and session-based authentication. Users look up words in Merriam-Webster dictionaries, save them to a personal vocabulary, and practise them in games scheduled by spaced repetition. The React frontend lives in a [separate repository](https://github.com/marusyaganza/client).
+Third version of the Language Power application: a vocabulary trainer for English and Spanish. This repository is its backend, a FastAPI service with PostgreSQL, Redis and session-based authentication. Users look up words in Merriam-Webster dictionaries, save them to a personal vocabulary, and practise them in games scheduled by spaced repetition. The React frontend lives in a [separate repository](https://github.com/marusyaganza/language-power-client).
 
 ## Status
 
@@ -229,9 +229,9 @@ The browser only ever talks to the Netlify origin, so the session cookie stays f
 
 ## Related projects
 
-- [client](https://github.com/marusyaganza/client): the React frontend of this version
-- [lp-monorepo](https://github.com/marusyaganza/lp-monorepo): second version, a TypeScript monorepo with a GraphQL server and a Storybook design system
-- [language-power](https://github.com/marusyaganza/language-power) and [language-power-backend](https://github.com/marusyaganza/language-power-backend): first version, an English-only app with an Express REST API
+- [language-power-client](https://github.com/marusyaganza/language-power-client): the React frontend of this version
+- [language-power-v2](https://github.com/marusyaganza/language-power-v2): second version, a TypeScript monorepo with a GraphQL server and a Storybook design system
+- [language-power-v1-client](https://github.com/marusyaganza/language-power-v1-client) and [language-power-v1-api](https://github.com/marusyaganza/language-power-v1-api): first version, an English-only app with an Express REST API
 
 ## Dictionary data
 
