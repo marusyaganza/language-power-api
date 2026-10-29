@@ -1,0 +1,51 @@
+[
+  {
+    "meta": {
+      "id": "ballena",
+      "uuid": "c6db476a-e51d-4ed4-b878-825964262055",
+      "src": "spanish",
+      "section": "alpha",
+      "stems": [
+        "ballena",
+        "ballenas"
+      ],
+      "offensive": false,
+      "lang": "es"
+    },
+    "hwi": {
+      "hw": "ballena"
+    },
+    "fl": "feminine noun",
+    "def": [
+      {
+        "sseq": [
+          [
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}whale"
+                  ],
+                  [
+                    "vis",
+                    [
+                      {
+                        "t": "Vimos una {it}ballena{/it} cerca del barco.",
+                        "tr": "We saw a whale near the boat."
+                      }
+                    ]
+                  ]
+                ]
+              }
+            ]
+          ]
+        ]
+      }
+    ],
+    "shortdef": [
+      "whale"
+    ]
+  }
+]

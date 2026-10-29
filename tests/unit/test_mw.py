@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 from dictionary.base import DictionaryError
-from dictionary.merriam_webster.api import extract_gender, fetch_entries
+from dictionary.merriam_webster.api import ART_URL, AUDIO_URL, extract_gender, fetch_entries
 
 API_URL = "https://mw-api.invalid/api/v3/references/collegiate/json"
 
@@ -224,3 +224,55 @@ def test_entries_without_definitions_are_no_error(provider_class, monkeypatch):
     # Nothing to learn from them, but not malformed: an empty result ("not found").
     no_defs = {k: v for k, v in entry("casa").items() if k != "shortdef"}
     assert search(provider_class, monkeypatch, [no_defs]).words == []
+
+
+# --------------------------------------------------------------------------- #
+# Shapes the made-up fixtures don't have
+# --------------------------------------------------------------------------- #
+
+
+def senses(*items):
+    return [{"sseq": [list(items)]}]
+
+
+def test_without_shortdef_the_definitions_come_from_the_senses(monkeypatch):
+    raw = entry("casa", shortdef=[])
+    raw["def"] = senses(
+        ["sense", {"dt": [["text", "{bc}a {d_link|building|building} for living in {dx}compare {dxt|hut||}{/dx}"]]}],
+        ["bs", {"sense": {"dt": [["text", "{bc}a {sx|home||} "]]}}],
+        ["pseq", [["sense", {"dt": [["text", "{bc}a family"]]}], ["sense", {"dt": [["text", "{bc}a firm"]]}]]],
+    )
+    [word] = search(EnglishDictionaryProvider, monkeypatch, [raw]).words
+    # Links keep their word, notes are dropped, and at most 3 senses are used.
+    assert word.defs == ["a building for living in", "a home", "a family"]
+
+
+def test_a_cross_reference_entry_is_defined_by_its_reference(monkeypatch):
+    raw = entry("casita", shortdef=[])
+    raw["cxs"] = [{"cxl": "small form of", "cxtis": [{"cxt": "casa:1"}]}]
+    [word] = search(EnglishDictionaryProvider, monkeypatch, [raw]).words
+    assert word.defs == ["small form of casa"]
+
+
+@pytest.mark.parametrize(
+    ("art", "img_url", "img_desc"),
+    [
+        ({"artid": "casa", "capt": "casa {sc}1{/sc}"}, f"{ART_URL}/casa.gif", "casa 1"),
+        ({"artid": "casa", "capt": ""}, f"{ART_URL}/casa.gif", None),
+        ({}, None, None),
+    ],
+)
+def test_the_illustration_and_its_caption(monkeypatch, art, img_url, img_desc):
+    [word] = search(EnglishDictionaryProvider, monkeypatch, [entry("casa", art=art)]).words
+    assert (word.img_url, word.img_desc) == (img_url, img_desc)
+
+
+@pytest.mark.parametrize(
+    ("audio", "subdir"),
+    [("casa001", "c"), ("ggcasa01", "gg"), ("bixcasa1", "bix"), ("3d00001", "number"), ("_casa01", "number")],
+)
+def test_the_audio_url_follows_mws_folders(monkeypatch, audio, subdir):
+    raw = entry("casa")
+    raw["hwi"]["prs"][0]["sound"]["audio"] = audio
+    [word] = search(EnglishDictionaryProvider, monkeypatch, [raw]).words
+    assert word.audio_url == f"{AUDIO_URL}/en/us/mp3/{subdir}/{audio}.mp3"

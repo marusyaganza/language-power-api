@@ -1,0 +1,55 @@
+[
+  {
+    "meta": {
+      "id": "wheel:1",
+      "uuid": "925e53aa-e56b-4dc5-bc9e-a342a6e11283",
+      "src": "collegiate",
+      "section": "alpha",
+      "stems": [
+        "wheel",
+        "wheels"
+      ],
+      "offensive": false
+    },
+    "hom": 1,
+    "hwi": {
+      "hw": "wheel",
+      "prs": [
+        {
+          "mw": "ˈwēl"
+        }
+      ]
+    },
+    "fl": "noun",
+    "def": [
+      {
+        "sseq": [
+          [
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}a round frame that turns around its center so that something can roll"
+                  ],
+                  [
+                    "vis",
+                    [
+                      {
+                        "t": "the front {wi}wheel{/wi} of a bicycle"
+                      }
+                    ]
+                  ]
+                ]
+              }
+            ]
+          ]
+        ]
+      }
+    ],
+    "shortdef": [
+      "a round frame that turns around its center so that something can roll"
+    ]
+  }
+]

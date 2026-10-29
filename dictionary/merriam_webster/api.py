@@ -120,8 +120,8 @@ def extract_definitions(entry) -> list[str]:
     """The entry's definitions.
 
     `shortdef` when the dictionary provides it. Otherwise the text of the
-    first senses in `def`, and for a cross-reference entry (no senses, e.g.
-    "murther") the reference itself: "chiefly dialectal variant of murder".
+    first senses in `def`, and for a cross-reference entry (no senses) the
+    reference itself, e.g. "small form of casa".
     """
     if entry.get("shortdef"):
         return entry["shortdef"]
@@ -190,7 +190,7 @@ def extract_image(word) -> str | None:
 
 
 def extract_image_desc(word) -> str | None:
-    """The caption of the entry's illustration ("wheel 1: 1 hub, 2 spoke, ..."),
+    """The caption of the entry's illustration ("wheel: 1 hub, 2 spoke"),
     or None if it has no illustration or an empty caption."""
     art = word.get("art") or {}
     if not art.get("artid"):

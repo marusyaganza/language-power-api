@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # True: dictionary lookups read recorded responses (dictionary/fixtures)
+    # True: dictionary lookups read made-up responses (dictionary/fixtures)
     # and need no keys. False: they call Merriam-Webster with the keys below.
     use_mocks: bool = False
     english_api_key: SecretStr | None = None

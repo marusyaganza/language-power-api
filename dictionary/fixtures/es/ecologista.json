@@ -1,0 +1,51 @@
+[
+  {
+    "meta": {
+      "id": "ecologista",
+      "uuid": "5916abc6-f8fa-4055-893d-2d3046dff20f",
+      "src": "spanish",
+      "section": "alpha",
+      "stems": [
+        "ecologista",
+        "ecologistas"
+      ],
+      "offensive": false,
+      "lang": "es"
+    },
+    "hwi": {
+      "hw": "ecologista"
+    },
+    "fl": "masculine or feminine noun",
+    "def": [
+      {
+        "sseq": [
+          [
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}environmentalist"
+                  ],
+                  [
+                    "vis",
+                    [
+                      {
+                        "t": "Mi hermana es ecologista.",
+                        "tr": "My sister is an environmentalist."
+                      }
+                    ]
+                  ]
+                ]
+              }
+            ]
+          ]
+        ]
+      }
+    ],
+    "shortdef": [
+      "environmentalist"
+    ]
+  }
+]

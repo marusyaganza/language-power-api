@@ -25,6 +25,8 @@ os.environ.update(
         "REDIS_URL": os.environ.get("TEST_REDIS_URL", "redis://localhost:6379/15"),
         # Never report test errors to Sentry, even with a DSN in `.env`.
         "SENTRY_DSN": "",
+        # URLs as the app builds them without a proxy, even with a ROOT_PATH in `.env`.
+        "ROOT_PATH": "",
     }
 )
 

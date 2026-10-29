@@ -101,7 +101,7 @@ Response (201):
   "questions": [
     {
       "id": 67,
-      "question": ["the organ in your chest that pumps blood", "the ___ thought of as the place where emotions are felt"],
+      "question": ["a trip from one place to another, usually a long one", "to go on a ___"],
       "options": null,
       "alt": null,
       "additional_info": {
@@ -161,7 +161,7 @@ upfront so images and audio can be preloaded.
 
 Definitions often contain the word they define. Wherever definitions are
 shown as clues or options, the word and its forms are replaced with `___`.
-For example, "the **heart** thought of as…" becomes "the ___ thought of as…".
+For example, "to go on a **journey**" becomes "to go on a ___".
 
 ### Options in the multiple-choice games
 
@@ -177,7 +177,7 @@ For example, "the **heart** thought of as…" becomes "the ___ thought of as…"
 ## 3. Answer a question: `POST /games/sessions/{session_id}/answers`
 
 ```json
-{ "word_id": 67, "answer": "heart" }
+{ "word_id": 67, "answer": "jorney" }
 ```
 
 What to send as `answer`:
@@ -191,7 +191,7 @@ What to send as `answer`:
 Response:
 
 ```json
-{ "grade": "close", "correct_answer": "heart", "session_complete": false }
+{ "grade": "close", "correct_answer": "journey", "session_complete": false }
 ```
 
 - `grade` is `correct`, `close` or `wrong`.

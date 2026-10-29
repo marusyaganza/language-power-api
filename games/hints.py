@@ -1,9 +1,9 @@
 """Hide the answer where a question's text gives it away.
 
-Dictionary definitions often contain the word they define ("heart": "the
-heart thought of as the place where emotions are felt"). Before a definition
-is shown as a clue or an option, every form of its word (the name and the
-dictionary stems, e.g. "hearts", "by heart") is replaced with `BLANK`.
+Dictionary definitions often contain the word they define ("journey": "to go
+on a journey"). Before a definition is shown as a clue or an option, every
+form of its word (the name and the dictionary stems, e.g. "journeys",
+"journeyed") is replaced with `BLANK`.
 """
 
 import re

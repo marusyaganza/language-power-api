@@ -5,10 +5,11 @@ from pydantic import AfterValidator, BaseModel, BeforeValidator, Field, field_va
 
 from core.language import Language
 from dictionary.entry import unique_definitions
+from dictionary.mock import is_sample_media_url
 
 # Limits on what a client can store, in characters (or items, for lists). They
 # keep one account from filling the database; real dictionary entries are far
-# below them (checked 2026-10-28 against the recorded entries: names up to 25
+# below them (checked 2026-10-28 against real MW entries: names up to 25
 # characters, definitions 307, examples 243, at most 9 stems and 3
 # definitions). Only input is checked: words already stored are returned as
 # they are.
@@ -36,8 +37,9 @@ def _empty_str_to_none(value):
 
 def _web_url(value: str | None) -> str | None:
     # The frontend puts these in <audio src> and <img src>: no javascript:,
-    # data: or other schemes.
-    if value is not None and not value.lower().startswith(("http://", "https://")):
+    # data: or other schemes. In mock mode, also the sample media's own paths,
+    # which the mock dictionaries return.
+    if value is not None and not (value.lower().startswith(("http://", "https://")) or is_sample_media_url(value)):
         raise ValueError("Must be an http:// or https:// URL")
     return value
 

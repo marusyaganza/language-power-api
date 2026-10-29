@@ -188,7 +188,7 @@ async def test_search_without_mock_data_lists_the_queries_that_have_it(client):
     response = await client.get("/words/search", params={"query": "zzz", "language": "en"})
     assert response.status_code == 200
     assert response.json()["words"] == []
-    assert "heart" in response.json()["mock_queries"]
+    assert response.json()["mock_queries"] == ["although", "brave", "journey", "wheel"]
 
 
 async def test_search_texts_have_a_length_limit(client):
@@ -233,6 +233,6 @@ class _BrokenProvider(DictionaryProvider):
 
 async def test_search_when_the_dictionary_fails_is_a_503(client, monkeypatch):
     monkeypatch.setitem(PROVIDERS, "en", _BrokenProvider())
-    response = await client.get("/words/search", params={"query": "heart", "language": "en"})
+    response = await client.get("/words/search", params={"query": "wheel", "language": "en"})
     assert response.status_code == 503
     assert response.json() == {"detail": "Dictionary is unavailable, try again later"}

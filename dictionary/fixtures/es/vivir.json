@@ -1,0 +1,67 @@
+[
+  {
+    "meta": {
+      "id": "vivir",
+      "uuid": "41b99589-1412-43e9-b295-0c6c9979e0b2",
+      "src": "spanish",
+      "section": "alpha",
+      "stems": [
+        "vivir",
+        "vivo",
+        "vives",
+        "vive",
+        "vivimos",
+        "viven"
+      ],
+      "offensive": false,
+      "lang": "es"
+    },
+    "hwi": {
+      "hw": "vivir"
+    },
+    "fl": "intransitive verb",
+    "def": [
+      {
+        "sseq": [
+          [
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}to live"
+                  ],
+                  [
+                    "vis",
+                    [
+                      {
+                        "t": "Vivimos en una casa pequeña.",
+                        "tr": "We live in a small house."
+                      }
+                    ]
+                  ]
+                ]
+              }
+            ],
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}to be alive"
+                  ]
+                ]
+              }
+            ]
+          ]
+        ]
+      }
+    ],
+    "shortdef": [
+      "to live",
+      "to be alive"
+    ]
+  }
+]

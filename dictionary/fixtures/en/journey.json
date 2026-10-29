@@ -1,0 +1,110 @@
+[
+  {
+    "meta": {
+      "id": "journey:1",
+      "uuid": "74dfdd9b-2457-4b68-bfbe-0a26547457be",
+      "src": "collegiate",
+      "section": "alpha",
+      "stems": [
+        "journey",
+        "journeys"
+      ],
+      "offensive": false
+    },
+    "hom": 1,
+    "hwi": {
+      "hw": "jour*ney",
+      "prs": [
+        {
+          "mw": "ˈjər-nē"
+        }
+      ]
+    },
+    "fl": "noun",
+    "def": [
+      {
+        "sseq": [
+          [
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}a trip from one place to another, usually a long one"
+                  ],
+                  [
+                    "vis",
+                    [
+                      {
+                        "t": "a {wi}journey{/wi} across the mountains"
+                      }
+                    ]
+                  ]
+                ]
+              }
+            ]
+          ]
+        ]
+      }
+    ],
+    "shortdef": [
+      "a trip from one place to another, usually a long one"
+    ]
+  },
+  {
+    "meta": {
+      "id": "journey:2",
+      "uuid": "c57a2ab4-505e-4841-9f79-71c0341b7aef",
+      "src": "collegiate",
+      "section": "alpha",
+      "stems": [
+        "journey",
+        "journeyed",
+        "journeying",
+        "journeys"
+      ],
+      "offensive": false
+    },
+    "hom": 2,
+    "hwi": {
+      "hw": "journey",
+      "prs": [
+        {
+          "mw": "ˈjər-nē"
+        }
+      ]
+    },
+    "fl": "verb",
+    "def": [
+      {
+        "sseq": [
+          [
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}to travel, especially over a long distance"
+                  ],
+                  [
+                    "vis",
+                    [
+                      {
+                        "t": "they {wi}journeyed{/wi} north for a week"
+                      }
+                    ]
+                  ]
+                ]
+              }
+            ]
+          ]
+        ]
+      }
+    ],
+    "shortdef": [
+      "to travel, especially over a long distance"
+    ]
+  }
+]

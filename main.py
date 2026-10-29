@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from auth.dependencies import limit_requests_per_ip
 from auth.router import auth_router
@@ -10,6 +11,7 @@ from core.database import engine
 from core.proxy_signature import require_proxy_signature
 from core.redis import redis_client
 from core.sentry import init_sentry
+from dictionary.mock import SAMPLE_MEDIA_DIR, SAMPLE_MEDIA_PATH
 from games.router import router as games_router
 from games.router import settings_router as game_settings_router
 from settings import settings
@@ -40,6 +42,12 @@ app.include_router(words_router, dependencies=_from_proxy)
 app.include_router(auth_router, dependencies=_from_proxy)
 app.include_router(games_router, dependencies=_from_proxy)
 app.include_router(game_settings_router, dependencies=_from_proxy)
+
+
+# The mock dictionaries' audio and pictures. Mock mode only, so never in
+# production; not behind the proxy signature, like any static file.
+if settings.use_mocks:
+    app.mount(SAMPLE_MEDIA_PATH, StaticFiles(directory=SAMPLE_MEDIA_DIR), name="sample-media")
 
 
 @app.get("/health", include_in_schema=False)

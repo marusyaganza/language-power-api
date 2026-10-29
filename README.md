@@ -116,7 +116,7 @@ Some rules hold everywhere:
    uvicorn main:app --reload
    ```
 
-   The API runs on `http://localhost:8000`, with interactive documentation at `http://localhost:8000/docs`. Sign up through `POST /auth/signup` or the frontend, then search for one of the mocked words, for example `heart` or `wheel` in English, or `hola` or `idioma` in Spanish. A search for any other word returns the list of mocked ones.
+   The API runs on `http://localhost:8000`, with interactive documentation at `http://localhost:8000/docs`. Sign up through `POST /auth/signup` or the frontend, then search for one of the mocked words, `wheel`, `brave`, `journey` or `although` in English, `ballena`, `idioma`, `ecologista` or `vivir` in Spanish. A search for any other word returns the list of mocked ones. `wheel` and `ballena` have audio and a picture; for them to load through the frontend's Vite proxy, set `ROOT_PATH=/api` in `.env`.
 
 ### Database migrations
 

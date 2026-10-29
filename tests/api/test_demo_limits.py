@@ -18,8 +18,8 @@ from users.models import User
 pytestmark = pytest.mark.anyio
 
 # Queries with mock data, so a search that reaches the provider succeeds.
-EN_QUERY = "heart"
-ES_QUERY = "hola"
+EN_QUERY = "wheel"
+ES_QUERY = "ballena"
 
 
 async def search(client, language="en", query=None):
@@ -107,7 +107,7 @@ async def test_todays_searches_are_shared_by_everyone(client, make_client, monke
 async def test_an_account_can_save_up_to_the_word_limit(client, monkeypatch):
     monkeypatch.setattr(settings, "max_words_per_user", 2)
     await save_word(client, "casa")
-    await save_word(client, "heart", language="en")
+    await save_word(client, "wheel", language="en")
     response = await client.post("/words/save", json={"name": "perro", "language": "es", "fl": "noun", "defs": ["dog"]})
     assert response.status_code == 409
     assert response.json()["detail"] == "You can save up to 2 words in this demo"

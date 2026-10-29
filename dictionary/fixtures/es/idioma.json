@@ -1,0 +1,51 @@
+[
+  {
+    "meta": {
+      "id": "idioma",
+      "uuid": "3b174fbb-a98e-4a43-ba56-4b7caaed199b",
+      "src": "spanish",
+      "section": "alpha",
+      "stems": [
+        "idioma",
+        "idiomas"
+      ],
+      "offensive": false,
+      "lang": "es"
+    },
+    "hwi": {
+      "hw": "idioma"
+    },
+    "fl": "masculine noun",
+    "def": [
+      {
+        "sseq": [
+          [
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}language"
+                  ],
+                  [
+                    "vis",
+                    [
+                      {
+                        "t": "Habla tres idiomas.",
+                        "tr": "She speaks three languages."
+                      }
+                    ]
+                  ]
+                ]
+              }
+            ]
+          ]
+        ]
+      }
+    ],
+    "shortdef": [
+      "language"
+    ]
+  }
+]

@@ -1,0 +1,68 @@
+[
+  {
+    "meta": {
+      "id": "brave",
+      "uuid": "d578d45f-f362-4262-a27d-80fa5bdfb16b",
+      "src": "collegiate",
+      "section": "alpha",
+      "stems": [
+        "brave",
+        "braver",
+        "bravest",
+        "bravely"
+      ],
+      "offensive": false
+    },
+    "hwi": {
+      "hw": "brave",
+      "prs": [
+        {
+          "mw": "ˈbrāv"
+        }
+      ]
+    },
+    "fl": "adjective",
+    "def": [
+      {
+        "sseq": [
+          [
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}ready to face danger or pain without running away"
+                  ],
+                  [
+                    "vis",
+                    [
+                      {
+                        "t": "a {wi}brave{/wi} firefighter"
+                      }
+                    ]
+                  ]
+                ]
+              }
+            ],
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}showing that you are not afraid"
+                  ]
+                ]
+              }
+            ]
+          ]
+        ]
+      }
+    ],
+    "shortdef": [
+      "ready to face danger or pain without running away",
+      "showing that you are not afraid"
+    ]
+  }
+]

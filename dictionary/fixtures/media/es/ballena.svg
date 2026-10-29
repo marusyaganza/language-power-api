@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" role="img" aria-label="A whale">
+  <title>ballena</title>
+  <!-- water -->
+  <path d="M0 132 Q20 124 40 132 T80 132 T120 132 T160 132 T200 132 T240 132 V160 H0 Z" fill="#9fd3f0"/>
+  <!-- spout -->
+  <g fill="none" stroke="#5bb4e5" stroke-width="5" stroke-linecap="round">
+    <path d="M84 52 Q84 34 84 22"/>
+    <path d="M84 30 Q74 18 64 16"/>
+    <path d="M84 30 Q94 18 104 16"/>
+  </g>
+  <!-- body and tail as one shape -->
+  <path d="M30 100
+           C30 66 62 52 98 54
+           C140 56 168 76 184 96
+           L206 74 C214 68 222 72 218 82
+           L204 104 L222 122 C226 132 216 136 208 130
+           L184 112
+           C160 132 120 138 84 134
+           C50 130 30 120 30 100 Z"
+        fill="#2f6f9f"/>
+  <!-- belly -->
+  <path d="M40 112 C70 128 130 130 170 112 C140 124 80 126 40 112 Z" fill="#cfe6f5"/>
+  <!-- eye and smile -->
+  <circle cx="62" cy="92" r="5" fill="#fff"/>
+  <circle cx="63" cy="93" r="2.5" fill="#123"/>
+  <path d="M36 104 Q52 112 70 106" fill="none" stroke="#123" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- flipper -->
+  <path d="M96 116 Q104 132 120 136 Q114 122 108 114 Z" fill="#245a82"/>
+</svg>

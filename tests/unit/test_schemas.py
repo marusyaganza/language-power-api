@@ -4,6 +4,7 @@ from pydantic import ValidationError
 
 from auth.schemas import LoginRequest, UserCreate
 from games.schemas import GameSettingsUpdate
+from settings import settings as app_settings
 from words import schemas
 from words.schemas import ExampleIn, WordCreate, WordUpdate
 
@@ -78,6 +79,45 @@ def test_media_urls_must_be_http(field, value):
 @pytest.mark.parametrize("value", ["https://a/x.mp3", "HTTP://a/x.mp3", "", None])
 def test_media_urls_accept_http_or_nothing(value):
     assert word_create(audio_url=value, img_url=value).audio_url == (value or None)
+
+
+@pytest.mark.parametrize("value", ["/sample-media/en/wheel.mp3", "/sample-media/es/ballena.svg"])
+def test_mock_mode_accepts_the_sample_media_paths(value):
+    assert app_settings.use_mocks
+    assert word_create(audio_url=value).audio_url == value
+    assert WordUpdate(img_url=value).img_url == value
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "/sample-media/../auth/me",
+        "/sample-media/en/../../auth/me",
+        "/sample-media/en/wheel.html",
+        "/sample-media/en/wheel.mp3/../../../auth/me",
+        "/sample-media/en/wheel.mp3?x=1",
+        "/sample-media/fr/wheel.mp3",
+        "/sample-media/en/Wheel.mp3",
+        "//evil.example/sample-media/en/wheel.mp3",
+        "/api/sample-media/en/wheel.mp3",  # ROOT_PATH is empty here
+    ],
+)
+def test_only_exact_sample_media_paths_are_accepted(value):
+    with pytest.raises(ValidationError):
+        word_create(audio_url=value)
+
+
+def test_sample_media_paths_follow_the_root_path(monkeypatch):
+    monkeypatch.setattr(app_settings, "root_path", "/api")
+    assert word_create(audio_url="/api/sample-media/en/wheel.mp3").audio_url == "/api/sample-media/en/wheel.mp3"
+    with pytest.raises(ValidationError):
+        word_create(audio_url="/sample-media/en/wheel.mp3")
+
+
+def test_sample_media_paths_are_refused_outside_mock_mode(monkeypatch):
+    monkeypatch.setattr(app_settings, "use_mocks", False)
+    with pytest.raises(ValidationError):
+        word_create(audio_url="/sample-media/en/wheel.mp3")
 
 
 def test_definitions_are_stripped_and_repeats_dropped():

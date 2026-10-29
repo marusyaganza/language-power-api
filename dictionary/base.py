@@ -42,7 +42,7 @@ class DictionaryProvider(ABC):
     touching the others. The rest of the app only calls `fetch`.
 
     A lookup is split in two so the mock providers (`dictionary.mock`) can
-    replace the request with a recorded answer and still run the real
+    replace the request with a made-up answer and still run the real
     parsing: `_fetch_raw` returns the API's answer as it was received (what
     the fixtures store), and `_parse` turns it into a `SearchResult`.
     """

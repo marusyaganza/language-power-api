@@ -1,0 +1,61 @@
+[
+  {
+    "meta": {
+      "id": "although",
+      "uuid": "8be00597-bfd8-44e0-a085-60f7031d9f0b",
+      "src": "collegiate",
+      "section": "alpha",
+      "stems": [
+        "although",
+        "altho"
+      ],
+      "offensive": false
+    },
+    "hwi": {
+      "hw": "al*though"
+    },
+    "fl": "conjunction",
+    "def": [
+      {
+        "sseq": [
+          [
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}in spite of the fact that"
+                  ],
+                  [
+                    "vis",
+                    [
+                      {
+                        "t": "{wi}Although{/wi} it was late, we kept walking."
+                      }
+                    ]
+                  ]
+                ]
+              }
+            ],
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}but"
+                  ]
+                ]
+              }
+            ]
+          ]
+        ]
+      }
+    ],
+    "shortdef": [
+      "in spite of the fact that",
+      "but"
+    ]
+  }
+]
