@@ -33,7 +33,7 @@ The spaced repetition is a simplified scheduler inspired by Anki's learning step
 
 ## Architecture
 
-![Architecture diagram: a React client calls the FastAPI app over HTTPS with a session cookie; the app stores auth and game sessions in Redis, users, words and learning progress in PostgreSQL, and looks words up in the Merriam-Webster Dictionary API, which mock mode replaces with made-up entries in the same format.](docs/architecture.png)
+![Architecture diagram: a React client calls the FastAPI app over HTTPS with a session cookie; the app stores auth and game sessions in Redis, users, words and learning progress in PostgreSQL, and looks words up in the Merriam-Webster Dictionary API, which tests and local development replace with made-up entries in the same format.](docs/architecture.png)
 
 Each feature module (`auth`, `words`, `games`) is split the same way:
 
