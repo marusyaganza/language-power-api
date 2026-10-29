@@ -8,8 +8,18 @@ Third version of the Language Power application: a vocabulary trainer for Englis
 
 - In active development
 - Deployed privately for my own daily use, with signup closed
-- No public demo yet; a separate demo deployment with mock dictionary data is planned
+- A public demo is being prepared; see [Demo](#demo)
 - Not a public production service
+
+## Demo
+
+The demo is a separate deployment of the same code, open to anyone who signs up. It looks words up in the live Merriam-Webster API, under limits that keep it within the API's free plan (at most 1,000 queries a day per dictionary) and keep strangers' data short-lived:
+
+- 10 dictionary searches per language for each account, and a daily cap for everyone together
+- accounts, with everything in them, are deleted after 24 hours
+- up to 50 new accounts a day, and 100 saved words per account
+
+The app shows how many searches are left, and explains the limits when one is reached. Saved words and games keep working after the searches are used up. The link will be added here when the demo is live.
 
 ## Features
 
@@ -23,7 +33,7 @@ The spaced repetition is a simplified scheduler inspired by Anki's learning step
 
 ## Architecture
 
-![Architecture diagram: a React client calls the FastAPI app over HTTPS with a session cookie; the app stores auth and game sessions in Redis, users, words and learning progress in PostgreSQL, and looks words up in the Merriam-Webster Dictionary API, which can be replaced by recorded fixtures in mock mode.](docs/architecture.png)
+![Architecture diagram: a React client calls the FastAPI app over HTTPS with a session cookie; the app stores auth and game sessions in Redis, users, words and learning progress in PostgreSQL, and looks words up in the Merriam-Webster Dictionary API, which mock mode replaces with made-up entries in the same format.](docs/architecture.png)
 
 Each feature module (`auth`, `words`, `games`) is split the same way:
 
@@ -62,7 +72,7 @@ Some rules hold everywhere:
 | `words/` | Dictionary search and the saved vocabulary |
 | `games/` | Game sessions, answer grading, spaced repetition and per-user settings |
 | `dictionary/` | One provider per language (`en/`, `es/`), the shared Merriam-Webster code (`merriam_webster/`), and the mock providers. [dictionary/README.md](dictionary/README.md) lists the steps for adding a language |
-| `dictionary/fixtures/` | Recorded Merriam-Webster responses used in mock mode |
+| `dictionary/fixtures/` | Made-up entries in Merriam-Webster's format, with sample audio and pictures, for tests and local development ([fixtures/README.md](dictionary/fixtures/README.md)) |
 | `alembic/` | Database migrations |
 | `tests/` | Unit tests (`tests/unit`) and API tests against real Postgres and Redis (`tests/api`) |
 | `docs/` | Games API documentation and the diagrams |
@@ -73,7 +83,7 @@ Some rules hold everywhere:
 
 - Python 3.12
 - [Docker](https://docs.docker.com/get-docker/), for PostgreSQL and Redis through the included `docker-compose.yml` (or servers of your own)
-- _(Optional)_ [Merriam-Webster API](https://dictionaryapi.com) keys for the Collegiate and Spanish-English dictionaries. In mock mode the app uses recorded responses instead, so no keys are needed.
+- _(Optional)_ [Merriam-Webster API](https://dictionaryapi.com) keys for Merriam-Webster's Collegiate® Dictionary and Spanish-English Dictionary. In mock mode the app uses a few made-up entries instead, so no keys are needed.
 
 ## Local development setup
 
@@ -142,7 +152,7 @@ Settings are read from the environment, then from `.env`. Names are case-insensi
 | --- | --- | --- |
 | `DATABASE_URL` | local `docker-compose.yml` database | PostgreSQL URL; must use the `postgresql+psycopg://` driver |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis URL; `rediss://user:password@host:port` for TLS |
-| `USE_MOCKS` | `false` | `true` serves recorded dictionary responses; `false` calls the real Merriam-Webster API |
+| `USE_MOCKS` | `false` | `true` serves made-up dictionary entries (tests and local development); `false` calls the real Merriam-Webster API |
 | `ENGLISH_API_KEY`, `SPANISH_API_KEY` | none | Merriam-Webster keys; required when `USE_MOCKS` is `false` |
 | `SIGNUP_ENABLED` | `true` | Whether `POST /auth/signup` creates accounts |
 | `COOKIE_SECURE` | `false` | Send the session cookie over HTTPS only; `true` in production |
@@ -220,9 +230,13 @@ The browser only ever talks to the Netlify origin, so the session cookie stays f
 - [lp-monorepo](https://github.com/marusyaganza/lp-monorepo): second version, a TypeScript monorepo with a GraphQL server and a Storybook design system
 - [language-power](https://github.com/marusyaganza/language-power) and [language-power-backend](https://github.com/marusyaganza/language-power-backend): first version, an English-only app with an Express REST API
 
+## Dictionary data
+
+Definitions, examples, pronunciation audio and illustrations come from the [Merriam-Webster Dictionary API](https://dictionaryapi.com): Merriam-Webster's Collegiate® Dictionary and Spanish-English Dictionary, © Merriam-Webster Inc. They are fetched live when a user searches and never stored in this repository. This project is not affiliated with or endorsed by Merriam-Webster Inc.
+
 ## Limitations
 
-- The deployment is private and signup is closed, so there are no demo credentials.
-- Real dictionary lookups need your own Merriam-Webster API keys; mock mode only knows the recorded words.
-- Hardening such as rate limiting and a health endpoint is planned but not done yet.
+- The personal deployment is private and signup is closed. The demo has open signup but strict limits (see [Demo](#demo)).
+- Real dictionary lookups need your own Merriam-Webster API keys; mock mode only knows four made-up words per language.
+- Rate limits are counted in memory, which is exact only because each deployment runs a single instance.
 - The data model may still change.

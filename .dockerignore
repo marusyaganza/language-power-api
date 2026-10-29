@@ -27,7 +27,6 @@ tests/
 requirements-dev.txt
 pytest.ini
 .coveragerc
-create_mocks.py
 docker-compose.yml
 Dockerfile
 .dockerignore
