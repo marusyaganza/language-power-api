@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/marusyaganza/py-lp/actions/workflows/ci.yml/badge.svg)](https://github.com/marusyaganza/py-lp/actions/workflows/ci.yml)
 
-Third version of the Language Power application: a vocabulary trainer for English and Spanish. This repository is its backend, a FastAPI service with PostgreSQL, Redis and session-based authentication. Users look up words in Merriam-Webster dictionaries, save them to a personal vocabulary, and practise them in games scheduled by spaced repetition. The React frontend lives in a separate repository.
+Third version of the Language Power application: a vocabulary trainer for English and Spanish. This repository is its backend, a FastAPI service with PostgreSQL, Redis and session-based authentication. Users look up words in Merriam-Webster dictionaries, save them to a personal vocabulary, and practise them in games scheduled by spaced repetition. The React frontend lives in a [separate repository](https://github.com/marusyaganza/client).
 
 ## Status
 
 - In active development
 - Deployed privately for my own daily use, with signup closed
-- A public demo is being prepared; see [Demo](#demo)
+- Public demo: [language-power.netlify.app](https://language-power.netlify.app/); see [Demo](#demo)
 - Not a public production service
 
 ## Demo
@@ -19,7 +19,10 @@ The demo is a separate deployment of the same code, open to anyone who signs up.
 - accounts, with everything in them, are deleted after 24 hours
 - up to 50 new accounts a day, and 100 saved words per account
 
-The app shows how many searches are left, and explains the limits when one is reached. Saved words and games keep working after the searches are used up. The link will be added here when the demo is live.
+The app shows how many searches are left, and explains the limits when one is reached. Saved words and games keep working after the searches are used up.
+
+- App: [language-power.netlify.app](https://language-power.netlify.app/). Sign up with any email address; it's never contacted.
+- API documentation: [language-power.netlify.app/api/docs](https://language-power.netlify.app/api/docs). "Try it out" works with the session of the app open in the same browser.
 
 ## Features
 
@@ -226,7 +229,7 @@ The browser only ever talks to the Netlify origin, so the session cookie stays f
 
 ## Related projects
 
-- Frontend: TODO add link
+- [client](https://github.com/marusyaganza/client): the React frontend of this version
 - [lp-monorepo](https://github.com/marusyaganza/lp-monorepo): second version, a TypeScript monorepo with a GraphQL server and a Storybook design system
 - [language-power](https://github.com/marusyaganza/language-power) and [language-power-backend](https://github.com/marusyaganza/language-power-backend): first version, an English-only app with an Express REST API
 
