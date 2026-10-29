@@ -111,3 +111,9 @@ async def test_session_cookie_is_not_secure_by_default(make_client):
     client = make_client()
     await signup(client)
     assert (await client.get("/auth/me")).status_code == 200
+
+
+async def test_the_docs_have_the_apps_own_title(make_client):
+    info = (await make_client().get("/openapi.json")).json()["info"]
+    assert (info["title"], info["version"]) == ("Language Power API", "3.0.0")
+    assert "session cookie" in info["description"]

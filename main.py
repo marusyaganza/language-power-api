@@ -29,10 +29,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await engine.dispose()
 
 
+# Shown at the top of /docs and /redoc.
+_DESCRIPTION = """\
+Backend of [Language Power](https://github.com/marusyaganza/language-power-api), a vocabulary trainer
+for English and Spanish: dictionary search, a personal vocabulary, and games scheduled by spaced
+repetition.
+
+Authentication is a session cookie set by `POST /auth/login` or `POST /auth/signup`. Opened from the
+app's own site, "Try it out" uses the session of the app open in the same browser.
+"""
+_app_info = {"title": "Language Power API", "version": "3.0.0", "description": _DESCRIPTION}
+
 if settings.docs_enabled:
-    app = FastAPI(lifespan=lifespan, root_path=settings.root_path)
+    app = FastAPI(lifespan=lifespan, root_path=settings.root_path, **_app_info)
 else:
-    app = FastAPI(lifespan=lifespan, root_path=settings.root_path, docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(
+        lifespan=lifespan, root_path=settings.root_path, docs_url=None, redoc_url=None, openapi_url=None, **_app_info
+    )
 
 # Every API route only answers requests from the frontend's proxy, and only so
 # many from one IP. In this order: the IP is only known once the signature is
