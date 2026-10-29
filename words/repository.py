@@ -38,7 +38,9 @@ async def get_vocabulary(
     stmt = select(Word).where(Word.user_id == user_id, Word.language == language)
 
     if query:
-        stmt = stmt.where(Word.name.ilike(f"%{query}%"))
+        # Case-insensitive substring match. `autoescape` makes "%" and "_" in
+        # the query plain characters, not LIKE wildcards.
+        stmt = stmt.where(Word.name.icontains(query, autoescape=True))
 
     total = await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
 

@@ -176,6 +176,15 @@ async def test_vocabulary_search_sort_and_pages(client):
     assert (empty["total"], empty["total_pages"], empty["items"]) == (0, 0, [])
 
 
+@pytest.mark.parametrize(("query", "found"), [("_", []), ("%", ["100%"]), ("/", ["a/b"]), ("0%", ["100%"])])
+async def test_vocabulary_search_treats_wildcards_as_text(client, query, found):
+    # Regression: "_" and "%" were LIKE wildcards, so "_" matched every word.
+    for name in ("casa", "100%", "a/b"):
+        await save_word(client, name)
+    page = (await client.get("/words/vocabulary", params={"language": "es", "query": query})).json()
+    assert [w["name"] for w in page["items"]] == found
+
+
 # --------------------------------------------------------------------------- #
 # Dictionary search (mock providers, see tests/conftest.py)
 # --------------------------------------------------------------------------- #
