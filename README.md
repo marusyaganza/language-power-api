@@ -183,7 +183,7 @@ ruff format .          # format
 
 New migrations are linted and formatted by ruff as Alembic writes them.
 
-CI runs ruff and then the whole suite against PostgreSQL and Redis containers on every push and pull request. No type checker is configured yet.
+CI runs ruff and then the whole suite against PostgreSQL and Redis containers on every push and pull request, and [pip-audit](https://pypi.org/project/pip-audit/) checks the pinned dependencies for known vulnerabilities. No type checker is configured yet.
 
 ## API overview
 
@@ -209,7 +209,7 @@ The API is built for the Language Power frontend only. [docs/games.md](docs/game
 The browser only ever talks to the Netlify origin, so the session cookie stays first-party (`SameSite=Lax`) and the API needs no CORS in production. Running a single instance keeps migrations on startup safe.
 
 - The `Dockerfile` builds a slim Python 3.12 image that runs as a non-root user. On start, `docker-entrypoint.sh` applies the migrations, syncs the games and starts Uvicorn.
-- `.github/workflows/ci.yml` runs ruff and the tests on every push and pull request.
+- `.github/workflows/ci.yml` runs ruff, the tests and the dependency audit on every push and pull request.
 - `.github/workflows/demo-cleanup.yml` runs daily and deletes demo accounts older than `ACCOUNT_TTL_HOURS` with all their data, for days when no signup does it.
 - `.github/workflows/deploy.yml` is started by hand. It runs the tests, builds and pushes the image, deploys it to Cloud Run, and checks that the new revision answers. GitHub authenticates to Google Cloud through Workload Identity Federation, so no service account key is stored anywhere.
 - The same image runs as two deployments, each in its own Google Cloud project with its own database, Redis and secrets: a private one (signup closed) and the public demo (open signup, `/docs` on, errors reported to Sentry). The workflow's `target` input picks one, and `deploy/<target>.env.yaml` holds its settings.

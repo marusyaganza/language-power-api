@@ -1,4 +1,5 @@
-# Lint, then unit and API tests against real Postgres and Redis containers.
+# Lint, then unit and API tests against real Postgres and Redis containers,
+# and a dependency audit next to them.
 # Runs on every push and pull request, and as the first job of deploy.yml.
 name: CI
 
@@ -70,3 +71,26 @@ jobs:
       # database, Redis database 15), so no .env or secrets are needed here.
       - name: Run tests
         run: python -m pytest -q
+
+  # Known vulnerabilities in the pinned dependencies (the PyPI advisory
+  # database and OSV). A new advisory fails CI, and so blocks deploys, until
+  # the package is bumped: fix it rather than ignoring it.
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # Its own tool, not part of requirements-dev.txt: it reads the files
+      # instead of the installed packages, so its own dependencies aren't audited.
+      - name: Install pip-audit
+        run: pip install pip-audit==2.10.1
+
+      # requirements-dev.txt includes requirements.txt.
+      - name: Audit dependencies
+        run: pip-audit --requirement requirements-dev.txt --progress-spinner off
