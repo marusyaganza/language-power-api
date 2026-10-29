@@ -1,11 +1,13 @@
 # tests/api/test_words.py
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from dictionary.base import DictionaryError, DictionaryProvider, SearchResult
 from dictionary.entry import DictionaryEntry
 from dictionary.providers import PROVIDERS
 from tests.api.conftest import save_word, signup
-from words.schemas import MAX_QUERY_LENGTH
+from words import service as words_service
+from words.schemas import MAX_QUERY_LENGTH, WordCreate
 
 pytestmark = pytest.mark.anyio
 
@@ -44,6 +46,16 @@ async def test_saving_the_same_word_twice_conflicts(client):
         },
     )
     assert response.status_code == 409
+    assert response.json() == {"detail": "Word already saved"}
+
+
+async def test_other_database_errors_are_not_reported_as_already_saved(client, db):
+    # Validation stops a bad gender before the service, so build the payload unvalidated.
+    user_id = (await client.get("/auth/me")).json()["id"]
+    payload = WordCreate.model_construct(uuid="uuid-x", name="x", language="es", fl="noun", defs=["x"], gender="neuter")
+    with pytest.raises(IntegrityError) as excinfo:
+        await words_service.save_word(db, user_id, payload)
+    assert "ck_words_gender" in str(excinfo.value)
 
 
 # --------------------------------------------------------------------------- #

@@ -24,6 +24,7 @@ import unicodedata
 from dataclasses import dataclass
 from math import ceil
 
+from psycopg.errors import UniqueViolation
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,6 +47,9 @@ from words.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+# One save per dictionary entry per user (`UniqueConstraint(..., name=...)` in words/models.py).
+WORD_UUID_UNIQUE_CONSTRAINT = "uq_user_word_uuid"
 
 __all__ = [
     "WordsError",
@@ -244,8 +248,9 @@ async def save_word(db: AsyncSession, user_id: int, payload: WordCreate) -> Word
     Raises:
         WordLimitReachedError: the user already has `settings.max_words_per_user`
             words. A race of two saves can go one word over, which is fine.
-        WordAlreadySavedError: the database rejected the insert as a
-            duplicate. Nothing is stored and the session is rolled back.
+        WordAlreadySavedError: the user already saved this dictionary entry
+            (same `uuid`). Nothing is stored and the session is rolled back.
+            Any other database error is raised unchanged, after the rollback.
     """
     limit = settings.max_words_per_user
     if limit is not None and await repository.count_words(db, user_id) >= limit:
@@ -271,9 +276,9 @@ async def save_word(db: AsyncSession, user_id: int, payload: WordCreate) -> Word
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
-        # TODO: every integrity error is currently reported as "already
-        # saved". Inspect `exc.orig` to tell a duplicate from other violations.
-        raise WordAlreadySavedError("Word already saved") from exc
+        if isinstance(exc.orig, UniqueViolation) and exc.orig.diag.constraint_name == WORD_UUID_UNIQUE_CONSTRAINT:
+            raise WordAlreadySavedError("Word already saved") from exc
+        raise
     # No refresh: it would expire `examples` and the router would then
     # lazy-load them. The id and created_at come back from the INSERT.
     return word
