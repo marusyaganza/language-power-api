@@ -1,3 +1,5 @@
+# Every package the app installs, pinned: the direct dependencies and the
+# packages they pull in (for example uvicorn's websockets and watchfiles).
 alembic==1.19.1
 annotated-doc==0.0.5
 annotated-types==0.8.0

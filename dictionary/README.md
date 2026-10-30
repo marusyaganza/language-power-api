@@ -20,7 +20,7 @@ Looks up words in external dictionary APIs and turns their answers into `Diction
 3. **Fixtures:** write four made-up entries in the API's format as `dictionary/fixtures/<language>/<word>.json`, one file per word, named by the lowercased query, with different parts of speech (and genders, if the language has them). Never record real answers: the dictionary's terms may not allow storing them, and Merriam-Webster's don't. See [fixtures/README.md](fixtures/README.md).
 4. **`PROVIDERS`:** add the language to both dictionaries in `providers.py`.
 5. **API key:** add `<language>_api_key` to `settings.py` and to the names checked by `keys_required_without_mocks`, then:
-   - a commented line in `.env.example` and a row in the README's environment variables table;
+   - a commented line in `.env.example` and a row in [docs/configuration.md](../docs/configuration.md);
    - a fake value in the environment block at the top of `tests/conftest.py`, so tests never use a real key;
    - a Secret Manager secret, and its entry in `--set-secrets` in `.github/workflows/deploy.yml`.
 6. **Games:** games with `all_languages` get the new language automatically. Language-specific games list their languages in `games/seed_data.py`. For example, the gender game needs the language in its `languages` list, and the provider must set `gender` to `masculine`, `feminine` or `both` (the database rejects other values). Run `python -m games.seed` afterwards.
