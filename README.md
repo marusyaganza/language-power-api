@@ -248,3 +248,7 @@ Definitions, examples, pronunciation audio and illustrations come from the [Merr
 - Real dictionary lookups need your own Merriam-Webster API keys; mock mode only knows four made-up words per language.
 - Rate limits are counted in memory, which is exact only because each deployment runs a single instance.
 - The data model may still change.
+
+## License
+
+[MIT](LICENSE). It covers this repository only, not the Merriam-Webster content the app fetches (see [Dictionary data](#dictionary-data)).
