@@ -42,7 +42,6 @@ _STATUS_FOR_ERROR: dict[type[service.GamesError], int] = {
     service.SessionNotFoundError: status.HTTP_404_NOT_FOUND,
     service.QuestionNotFoundError: status.HTTP_404_NOT_FOUND,
     service.SessionFinishedError: status.HTTP_409_CONFLICT,
-    service.QuestionAlreadyAnsweredError: status.HTTP_409_CONFLICT,
     service.NotEnoughWordsError: status.HTTP_409_CONFLICT,
 }
 
@@ -110,10 +109,11 @@ async def submit_answer(
     """Grade an answer in a running game session.
 
     404 if the session expired, belongs to another user, or has no such
-    question, 409 if the session is finished or the question was already
-    answered. The learning progress is saved before the response is sent; a
-    failure to save it is logged, not reported, since the answer has already
-    been graded.
+    question, 409 if the session is finished and the question was never
+    answered. A question answered before gets its first grade again, so a
+    retry after a lost response can carry on. The learning progress is saved
+    before the response is sent, once per question; a failure to save it is
+    logged, not reported, since the answer has already been graded.
     """
     with _http_errors():
         check = await service.check_answer(
@@ -123,13 +123,14 @@ async def submit_answer(
             answer=payload.answer,
         )
 
-    await service.persist_review_result(
-        db,
-        user_id=user.id,
-        word_id=payload.word_id,
-        game_type=check.game_type,
-        grade=check.grade,
-    )
+    if not check.repeated:
+        await service.persist_review_result(
+            db,
+            user_id=user.id,
+            word_id=payload.word_id,
+            game_type=check.game_type,
+            grade=check.grade,
+        )
     return AnswerResponse(
         grade=check.grade,
         correct_answer=check.correct_answer,
