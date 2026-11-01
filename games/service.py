@@ -85,7 +85,6 @@ __all__ = [
     "SessionNotFoundError",
     "QuestionNotFoundError",
     "SessionFinishedError",
-    "QuestionAlreadyAnsweredError",
     "NotEnoughWordsError",
     "AnswerCheck",
     "list_games_for_language",
@@ -134,10 +133,6 @@ class QuestionNotFoundError(GamesError):
 
 class SessionFinishedError(GamesError):
     """The game session is finished and takes no more answers."""
-
-
-class QuestionAlreadyAnsweredError(GamesError):
-    """The question was already answered; only the first answer counts."""
 
 
 class NotEnoughWordsError(GamesError):
@@ -448,13 +443,16 @@ class AnswerCheck:
 
     `correct_answer` is None when the answer was fully correct, otherwise the
     expected answer. `game_type` is passed along so the caller can record the
-    review with `persist_review_result`.
+    review with `persist_review_result`. `repeated` is True when the question
+    had already been answered: the grade is the first one, and the review is
+    already recorded.
     """
 
     grade: AnswerGrade
     correct_answer: str | None
     session_complete: bool
     game_type: str
+    repeated: bool = False
 
 
 async def check_answer(user_id: int, session_id: str, word_id: int, answer: str) -> AnswerCheck:
@@ -465,30 +463,40 @@ async def check_answer(user_id: int, session_id: str, word_id: int, answer: str)
     is not recorded until the caller passes the result to
     `persist_review_result`.
 
-    Each question can be answered once: the response reveals the expected
-    answer, so a second attempt would let the player copy it.
+    Each question is graded once: the response reveals the expected answer,
+    so a second attempt would let the player copy it. Answering it again, for
+    example a retry after the first response was lost, returns the first grade
+    with `repeated` set, whatever the new answer is. That reveals nothing the
+    first response didn't.
 
     Raises:
         SessionNotFoundError: the session expired, never existed, or belongs
             to another user.
-        SessionFinishedError: the session is already finished.
         QuestionNotFoundError: the session has no question for `word_id`.
-        QuestionAlreadyAnsweredError: the question was already answered.
+        SessionFinishedError: the session is finished and the question was
+            never answered.
     """
     session_data = await _get_own_session(user_id, session_id)
-
-    if session_data.get("finished"):
-        raise SessionFinishedError("Session is already finished")
 
     try:
         question = get_question(session_data, word_id)
     except GameSessionNotFound as exc:
         raise QuestionNotFoundError("Question not found in session") from exc
 
-    if is_answered(question):
-        raise QuestionAlreadyAnsweredError("Question was already answered")
-
     game_type = session_data["game_type"]
+    if is_answered(question):
+        first = AnswerGrade(question["grade"])
+        return AnswerCheck(
+            grade=first,
+            correct_answer=None if first == AnswerGrade.CORRECT else question["answer"],
+            session_complete=bool(session_data.get("finished")),
+            game_type=game_type,
+            repeated=True,
+        )
+
+    if session_data.get("finished"):
+        raise SessionFinishedError("Session is already finished")
+
     grade = _grade(game_type, answer, question["answer"])
     session_complete = await mark_question_answered(session_id, session_data, word_id, grade.value)
 

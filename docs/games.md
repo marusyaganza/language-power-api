@@ -207,8 +207,10 @@ Response:
 | `close` | Typed games: a small typo ("balena" for "ballena"). Gender game: only one gender ticked for a noun that takes both. |
 | `wrong` | Anything else. In the gender game, ticking both for a noun with one gender is wrong. |
 
-**Each question can be answered only once.** A second answer is rejected
-(409), since the first response already showed the correct answer.
+**Each question is graded only once.** Answering it again returns the first
+response unchanged, whatever the new answer is, since that response already
+showed the correct answer. This lets a client retry an answer whose response
+was lost; the review is recorded only once.
 
 ## 4. Result: `POST /games/sessions/{session_id}/result`
 
@@ -235,7 +237,8 @@ Ends the session if it's still running and returns its result. No body.
 Requesting the result ends the session, even if some questions are
 unanswered. After that:
 
-- no more answers are accepted (409);
+- unanswered questions take no more answers (409); questions answered
+  before still return their first response;
 - unanswered words are reported as `"unanswered"` and do not affect the
   word's practice schedule;
 - the result can be requested again: the same call returns the same result,
@@ -354,7 +357,7 @@ one.
 |---|---|
 | 401 | Not logged in, or the session cookie expired. |
 | 404 | Game doesn't exist. Session expired, never existed, or belongs to another user. The word isn't part of the session. |
-| 409 | Question already answered. Session already finished. Starting `select_word`/`select_def` with fewer words than `min_word_count`. |
+| 409 | Answering a question the session finished without. Starting `select_word`/`select_def` with fewer words than `min_word_count`. |
 | 422 | Invalid request values, e.g. a session started without `language`, or game settings out of range. |
 | 501 | The game exists but can't be played yet. All six games above are playable. |
 

@@ -136,14 +136,41 @@ async def test_wrong_answer_reveals_the_expected_one(client, games):
     assert response["correct_answer"] == "casa"
 
 
-async def test_a_question_can_be_answered_only_once(client, games):
-    await save_word(client, "casa")
-    await save_word(client, "perro")
+async def review_grades(db, word_id):
+    progress = await db.scalar(select(WordProgress).where(WordProgress.word_id == word_id))
+    logs = (await db.scalars(select(ReviewLog).where(ReviewLog.word_progress_id == progress.id))).all()
+    return [log.grade for log in logs]
+
+
+async def test_a_repeated_answer_gets_the_first_grade(client, db, games):
+    casa = await save_word(client, "casa")
+    perro = await save_word(client, "perro")
+    name_of = {casa["id"]: "casa", perro["id"]: "perro"}
     _gid, session = await start(client, "type_word")
     first = session["questions"][0]["id"]
 
-    assert (await answer(client, session, first, "x")).json()["session_complete"] is False
-    assert (await answer(client, session, first, "casa")).status_code == 409
+    graded = await answer(client, session, first, "x")
+    assert graded.json() == {"grade": "wrong", "correct_answer": name_of[first], "session_complete": False}
+
+    # A retry, even with the right answer, is not graded again or recorded twice.
+    repeated = await answer(client, session, first, name_of[first])
+    assert repeated.status_code == 200, repeated.text
+    assert repeated.json() == graded.json()
+    assert await review_grades(db, first) == ["wrong"]
+
+
+async def test_a_repeated_last_answer_still_completes_the_session(client, db, games):
+    word = await save_word(client, "casa")
+    _gid, session = await start(client, "type_word")
+
+    graded = await answer(client, session, word["id"], "casa")
+    assert graded.json()["session_complete"] is True
+
+    # The response to the last answer was lost; the retry finds the session finished.
+    repeated = await answer(client, session, word["id"], "casa")
+    assert repeated.status_code == 200, repeated.text
+    assert repeated.json() == graded.json()
+    assert await review_grades(db, word["id"]) == ["correct"]
 
 
 async def test_answer_for_a_word_not_in_the_session(client, games):
