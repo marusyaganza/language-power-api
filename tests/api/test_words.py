@@ -215,7 +215,7 @@ async def test_search_without_mock_data_lists_the_queries_that_have_it(client):
     response = await client.post("/words/search", json={"query": "zzz", "language": "en"})
     assert response.status_code == 200
     assert response.json()["words"] == []
-    assert response.json()["mock_queries"] == ["although", "brave", "journey", "wheel"]
+    assert response.json()["mock_queries"] == ["although", "brave", "cat", "journey", "wheel"]
 
 
 async def test_search_texts_have_a_length_limit(client):

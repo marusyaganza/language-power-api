@@ -1,0 +1,54 @@
+[
+  {
+    "meta": {
+      "id": "cat",
+      "uuid": "6bd1d2cc-eba2-4615-a66e-bab85c74f1b4",
+      "src": "collegiate",
+      "section": "alpha",
+      "stems": [
+        "cat",
+        "cats"
+      ],
+      "offensive": false
+    },
+    "hwi": {
+      "hw": "cat",
+      "prs": [
+        {
+          "mw": "ˈkat"
+        }
+      ]
+    },
+    "fl": "noun",
+    "def": [
+      {
+        "sseq": [
+          [
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}a small furry animal with whiskers and claws, often kept as a pet"
+                  ],
+                  [
+                    "vis",
+                    [
+                      {
+                        "t": "the {wi}cat{/wi} slept on the windowsill"
+                      }
+                    ]
+                  ]
+                ]
+              }
+            ]
+          ]
+        ]
+      }
+    ],
+    "shortdef": [
+      "a small furry animal with whiskers and claws, often kept as a pet"
+    ]
+  }
+]

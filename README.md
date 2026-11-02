@@ -137,7 +137,7 @@ Some rules hold everywhere:
    uvicorn main:app --reload
    ```
 
-   The API runs on `http://localhost:8000`, with interactive documentation at `http://localhost:8000/docs`. Sign up through `POST /auth/signup` or the frontend, then search for one of the mocked words, `wheel`, `brave`, `journey` or `although` in English, `ballena`, `idioma`, `ecologista` or `vivir` in Spanish. A search for any other word returns the list of mocked ones. `wheel` and `ballena` have audio and a picture; for them to load through the frontend's Vite proxy, set `ROOT_PATH=/api` in `.env`.
+   The API runs on `http://localhost:8000`, with interactive documentation at `http://localhost:8000/docs`. Sign up through `POST /auth/signup` or the frontend, then search for one of the mocked words, `cat`, `wheel`, `brave`, `journey` or `although` in English, `gato`, `ballena`, `idioma`, `ecologista` or `vivir` in Spanish. A search for any other word returns the list of mocked ones. `cat` and `gato` have audio and a picture, loaded straight from Wikimedia Commons and Lorem Picsum, so they need an internet connection.
 
 ### Database migrations
 

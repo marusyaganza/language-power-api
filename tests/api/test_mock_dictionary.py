@@ -6,8 +6,7 @@ import json
 import pytest
 
 from core.language import Language
-from dictionary.mock import FIXTURES_DIR, SAMPLE_MEDIA_DIR, SAMPLE_MEDIA_PATH
-from settings import settings
+from dictionary.mock import FIXTURES_DIR, SAMPLE_MEDIA
 
 pytestmark = pytest.mark.anyio
 
@@ -22,11 +21,9 @@ async def search(client, query, language):
     return response.json()["words"]
 
 
-def test_every_media_file_belongs_to_a_fixture_word():
-    for language in Language:
-        for path in (SAMPLE_MEDIA_DIR / language).iterdir():
-            assert path.suffix in (".mp3", ".svg"), path
-            assert path.stem in FIXTURE_WORDS[language], path
+def test_every_sample_media_word_has_a_fixture():
+    for language, name in SAMPLE_MEDIA:
+        assert name in FIXTURE_WORDS[language], (language, name)
 
 
 def test_the_fixtures_link_to_no_merriam_webster_media():
@@ -39,52 +36,37 @@ def test_the_fixtures_link_to_no_merriam_webster_media():
 
 
 @pytest.mark.parametrize("language", list(Language))
-async def test_every_fixture_word_is_found_and_its_media_is_served(client, language):
-    media_urls = []
+async def test_every_fixture_word_is_found(client, language):
     for query in FIXTURE_WORDS[language]:
         words = await search(client, query, language)
         assert words, query
         assert all(word["defs"] and word["fl"] for word in words), query
-        media_urls += [url for word in words for url in (word["audio_url"], word["img_url"]) if url]
-
-    assert media_urls  # each language has some
-    for url in media_urls:
-        response = await client.get(url)
-        assert response.status_code == 200, url
-        assert response.headers["content-type"].startswith(("audio/mpeg", "image/svg+xml")), url
 
 
 async def test_words_with_sample_media_get_their_urls(client):
-    [wheel] = await search(client, "wheel", "en")
-    assert wheel["audio_url"] == f"{SAMPLE_MEDIA_PATH}/en/wheel.mp3"
-    assert wheel["img_url"] == f"{SAMPLE_MEDIA_PATH}/en/wheel.svg"
+    [cat] = await search(client, "cat", "en")
+    assert (cat["audio_url"], cat["img_url"]) == (
+        SAMPLE_MEDIA["en", "cat"]["audio_url"],
+        SAMPLE_MEDIA["en", "cat"]["img_url"],
+    )
 
     journeys = await search(client, "journey", "en")
     assert [(w["fl"], w["audio_url"], w["img_url"]) for w in journeys] == [("noun", None, None), ("verb", None, None)]
 
-    [ballena] = await search(client, "ballena", "es")
-    assert (ballena["gender"], ballena["audio_url"]) == ("feminine", f"{SAMPLE_MEDIA_PATH}/es/ballena.mp3")
-
-
-async def test_media_urls_include_the_root_path(client, monkeypatch):
-    monkeypatch.setattr(settings, "root_path", "/api")
-    [wheel] = await search(client, "wheel", "en")
-    assert wheel["audio_url"] == "/api/sample-media/en/wheel.mp3"
-
-    saved = await client.post("/words/save", json={**wheel, "language": "en"})
-    assert saved.status_code == 201, saved.text
+    [gato] = await search(client, "gato", "es")
+    assert (gato["gender"], gato["audio_url"]) == ("masculine", SAMPLE_MEDIA["es", "gato"]["audio_url"])
 
 
 async def test_a_mock_word_is_saved_with_its_media(client):
-    [ballena] = await search(client, "ballena", "es")
-    response = await client.post("/words/save", json={**ballena, "language": "es"})
+    [gato] = await search(client, "gato", "es")
+    response = await client.post("/words/save", json={**gato, "language": "es"})
     assert response.status_code == 201, response.text
-    assert response.json()["img_url"] == f"{SAMPLE_MEDIA_PATH}/es/ballena.svg"
+    assert response.json()["img_url"] == SAMPLE_MEDIA["es", "gato"]["img_url"]
 
 
 async def test_the_fixture_words_cover_every_game(client):
-    """Each language has 4 words (choice games need 4), and Spanish has all three genders."""
-    assert [len(words) for words in FIXTURE_WORDS.values()] == [4, 4]
+    """Each language has at least 4 words (choice games need 4), and Spanish has all three genders."""
+    assert all(len(words) >= 4 for words in FIXTURE_WORDS.values())
     genders = set()
     for query in FIXTURE_WORDS[Language.ES]:
         genders |= {word["gender"] for word in await search(client, query, "es")}

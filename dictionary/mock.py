@@ -5,40 +5,35 @@ and local development. The responses live in
 `FIXTURES_DIR/<language>/<query>.json`, in the shape of the provider's
 `_fetch_raw` answer, but written for this project (fixtures/README.md).
 
-Audio and pictures for some words are in `SAMPLE_MEDIA_DIR/<language>/`, named
-`<word>.mp3` and `<word>.svg`. `main` serves them at `SAMPLE_MEDIA_PATH`, and
-the mock providers point the entries' `audio_url` and `img_url` at them.
+A few words get audio and a picture from `SAMPLE_MEDIA`: free files hosted
+elsewhere (credited in fixtures/README.md), so the browser loads them directly.
 """
 
 import json
-import re
 from dataclasses import replace
 from pathlib import Path
 
 from core.language import Language
 from dictionary.base import SearchResult
 from dictionary.entry import DictionaryEntry
-from settings import settings
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
-SAMPLE_MEDIA_DIR = FIXTURES_DIR / "media"
-SAMPLE_MEDIA_PATH = "/sample-media"
-_SAMPLE_MEDIA_FILE_RE = re.compile(r"(en|es)/[a-z]+\.(mp3|svg)")
 
-
-def sample_media_url(language: Language, filename: str) -> str:
-    """The URL of a sample media file, as the browser sees it (with `settings.root_path`)."""
-    return f"{settings.root_path}{SAMPLE_MEDIA_PATH}/{language}/{filename}"
-
-
-def is_sample_media_url(url: str) -> bool:
-    """Whether `url` is one `sample_media_url` could have made. Only in mock mode."""
-    prefix = f"{settings.root_path}{SAMPLE_MEDIA_PATH}/"
-    return (
-        settings.use_mocks
-        and url.startswith(prefix)
-        and _SAMPLE_MEDIA_FILE_RE.fullmatch(url.removeprefix(prefix)) is not None
-    )
+_CAT_PICTURE = "https://picsum.photos/id/40/400/300"
+# (language, word name) → audio_url and img_url.
+SAMPLE_MEDIA = {
+    (Language.EN, "cat"): {
+        "audio_url": "https://upload.wikimedia.org/wikipedia/commons/transcoded/4/46/En-us-cat.ogg/En-us-cat.ogg.mp3",
+        "img_url": _CAT_PICTURE,
+    },
+    (Language.ES, "gato"): {
+        "audio_url": (
+            "https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/LL-Q1321_%28spa%29-Millars-gato.wav"
+            "/LL-Q1321_%28spa%29-Millars-gato.wav.mp3"
+        ),
+        "img_url": _CAT_PICTURE,
+    },
+}
 
 
 class MockDictionaryMixin:
@@ -56,7 +51,6 @@ class MockDictionaryMixin:
 
     def __init__(self) -> None:
         self._fixtures = {path.stem: path for path in (FIXTURES_DIR / self.language).glob("*.json")}
-        self._media = {path.name for path in (SAMPLE_MEDIA_DIR / self.language).glob("*")}
 
     async def fetch(self, query: str) -> SearchResult:
         key = query.strip().lower()
@@ -71,9 +65,4 @@ class MockDictionaryMixin:
 
     def _with_sample_media(self, word: DictionaryEntry) -> DictionaryEntry:
         """The entry with its sample audio and picture, where the word has them."""
-        media = {}
-        for field, extension in (("audio_url", "mp3"), ("img_url", "svg")):
-            filename = f"{word.name.lower()}.{extension}"
-            if filename in self._media:
-                media[field] = sample_media_url(self.language, filename)
-        return replace(word, **media)
+        return replace(word, **SAMPLE_MEDIA.get((self.language, word.name.lower()), {}))
