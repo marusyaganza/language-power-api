@@ -1,10 +1,14 @@
 # tests/api/test_auth.py
+import re
+
 import pytest
+from fastapi.routing import APIRoute
 from sqlalchemy.exc import IntegrityError
 
 import auth.service
 from auth.rate_limit import AttemptLimiter
 from auth.schemas import UserCreate
+from main import app
 from settings import settings
 from tests.api.conftest import PASSWORD, signup
 from users import service as users_service
@@ -23,6 +27,17 @@ async def test_signup_logs_in_and_logout_ends_session(make_client):
 
     assert (await client.post("/auth/logout")).status_code == 200
     assert (await client.get("/auth/me")).status_code == 401
+
+
+async def test_activity_does_not_extend_the_session(make_client, redis):
+    client = make_client()
+    await signup(client)
+    key = auth.service._session_key(client.cookies[settings.session_cookie_name])
+    await redis.expire(key, 60)  # as if the session were about to end
+
+    assert (await client.get("/auth/me")).status_code == 200
+    # The cookie's Max-Age is fixed at login, so the session ends with it.
+    assert await redis.ttl(key) <= 60
 
 
 async def test_login_checks_the_password(make_client):
@@ -96,6 +111,37 @@ async def test_requests_without_a_valid_session_are_rejected(make_client):
     assert (await client.get("/words/vocabulary", params={"language": "es"})).status_code == 401
     client.cookies.set(settings.session_cookie_name, "made-up-session-id")
     assert (await client.get("/auth/me")).status_code == 401
+
+
+# The only routes that answer without a session. Anything else is the user's data.
+PUBLIC_ROUTES = {
+    ("GET", "/health"),
+    ("POST", "/auth/signup"),
+    ("POST", "/auth/login"),
+    ("POST", "/auth/logout"),
+    ("GET", "/auth/config"),
+}
+
+
+def api_routes(routes):
+    """Every (method, path) the app serves. FastAPI keeps an included router as one entry, so look inside it."""
+    for route in routes:
+        if isinstance(route, APIRoute):
+            for method in route.methods:
+                yield method, route.path
+        elif hasattr(route, "original_router"):
+            yield from api_routes(route.original_router.routes)
+
+
+async def test_every_route_but_the_public_ones_needs_a_session(make_client):
+    routes = set(api_routes(app.routes))
+    # Also proves the walk above found the routers' routes.
+    assert PUBLIC_ROUTES <= routes
+
+    client = make_client()
+    for method, path in sorted(routes - PUBLIC_ROUTES):
+        response = await client.request(method, re.sub(r"\{[^}]+\}", "1", path))
+        assert response.status_code == 401, f"{method} {path} answered {response.status_code} without a session"
 
 
 async def test_signup_race_for_one_email_is_a_409_not_a_500(make_client, monkeypatch):

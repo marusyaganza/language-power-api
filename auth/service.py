@@ -52,7 +52,6 @@ __all__ = [
     "login",
     "create_session",
     "get_user_id_for_session",
-    "refresh_session_if_needed",
     "destroy_session",
 ]
 
@@ -268,8 +267,8 @@ def _session_key(session_id: str) -> str:
 async def create_session(user_id: int) -> str:
     """Start a session for `user_id` and return its id.
 
-    The session expires `settings.session_ttl_seconds` after its last
-    refresh (see `refresh_session_if_needed`).
+    The session expires `settings.session_ttl_seconds` after it starts,
+    however active the user is, like the cookie that carries it.
     """
     session_id = secrets.token_urlsafe(32)
     await redis_client.set(
@@ -284,22 +283,6 @@ async def get_user_id_for_session(session_id: str) -> int | None:
     """Return the user the session belongs to, or None if it is unknown or has expired."""
     user_id = await redis_client.get(_session_key(session_id))
     return int(user_id) if user_id is not None else None
-
-
-async def refresh_session_if_needed(session_id: str) -> None:
-    """Restart the session's lifetime once less than half of it is left.
-
-    Call this on authenticated requests so active users stay logged in. It
-    only writes to Redis in the second half of the lifetime, which avoids a
-    write on every request. Does nothing for a session that is unknown or
-    already expired.
-    """
-    ttl = await redis_client.ttl(_session_key(session_id))
-    if ttl <= 0:
-        return  # key doesn't exist or has no TTL, so there is nothing to refresh
-
-    if ttl < settings.session_ttl_seconds / 2:
-        await redis_client.expire(_session_key(session_id), settings.session_ttl_seconds)
 
 
 async def destroy_session(session_id: str) -> None:

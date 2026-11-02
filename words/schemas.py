@@ -146,6 +146,11 @@ class WordUpdate(BaseModel):
         return unique_definitions(cleaned)
 
 
+class WordSearchRequest(BaseModel):
+    query: str = Field(max_length=MAX_QUERY_LENGTH)
+    language: Language
+
+
 class WordSearchResponse(BaseModel):
     words: list[WordOut]
     suggestions: list[str] = []  # spelling suggestions from the dictionary

@@ -184,7 +184,7 @@ CI runs ruff and then the whole suite against PostgreSQL and Redis containers on
 
 ## API overview
 
-- **Authentication:** server-side sessions. Logging in stores a random session id in Redis and sends it in an `HttpOnly`, `SameSite=Lax` cookie. Sessions last 30 days and are extended while the user is active. Passwords are hashed with bcrypt.
+- **Authentication:** server-side sessions. Logging in stores a random session id in Redis and sends it in an `HttpOnly`, `SameSite=Lax` cookie. Sessions last 30 days from login, however active the user is; logging out ends one at once. Passwords are hashed with bcrypt.
 - **Documentation:** OpenAPI at `/docs` and `/redoc` when `DOCS_ENABLED` is on.
 - **Resource groups:**
 
