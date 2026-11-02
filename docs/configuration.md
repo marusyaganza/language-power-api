@@ -10,7 +10,7 @@ Settings are read from the environment, then from `.env`. Names are case-insensi
 | `ENGLISH_API_KEY`, `SPANISH_API_KEY` | none | Merriam-Webster keys; required when `USE_MOCKS` is `false` |
 | `SIGNUP_ENABLED` | `true` | Whether `POST /auth/signup` creates accounts |
 | `COOKIE_SECURE` | `false` | Send the session cookie over HTTPS only; `true` in production |
-| `SESSION_TTL_SECONDS` | 30 days | Session lifetime |
+| `SESSION_TTL_SECONDS` | 30 days | Session lifetime, from login. Activity doesn't extend it |
 | `SESSION_COOKIE_NAME` | `session_id` | Name of the session cookie |
 | `DOCS_ENABLED` | `true` | Serve `/docs`, `/redoc` and `/openapi.json`; `false` in production |
 | `ROOT_PATH` | empty | The prefix a proxy strips before forwarding (`/api` behind Netlify), so `/docs` works through it |

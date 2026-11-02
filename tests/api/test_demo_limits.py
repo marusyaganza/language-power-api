@@ -24,7 +24,7 @@ ES_QUERY = "ballena"
 
 async def search(client, language="en", query=None):
     query = query or (EN_QUERY if language == "en" else ES_QUERY)
-    return await client.get("/words/search", params={"query": query, "language": language})
+    return await client.post("/words/search", json={"query": query, "language": language})
 
 
 @pytest.fixture

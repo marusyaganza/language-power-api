@@ -191,7 +191,7 @@ async def test_vocabulary_search_treats_wildcards_as_text(client, query, found):
 
 
 async def test_search_marks_saved_words(client):
-    results = (await client.get("/words/search", params={"query": "vivir", "language": "es"})).json()
+    results = (await client.post("/words/search", json={"query": "vivir", "language": "es"})).json()
     entries = results["words"]
     assert {w["name"] for w in entries} >= {"vivir"}
     assert not any(w["saved"] for w in entries)
@@ -199,14 +199,20 @@ async def test_search_marks_saved_words(client):
     first = entries[0]
     await save_word(client, first["name"], uuid=first["uuid"], defs=first["defs"])
 
-    again = (await client.get("/words/search", params={"query": "vivir", "language": "es"})).json()
+    again = (await client.post("/words/search", json={"query": "vivir", "language": "es"})).json()
     saved = {w["uuid"]: w["saved"] for w in again["words"]}
     assert saved.pop(first["uuid"]) is True
     assert not any(saved.values())
 
 
+async def test_search_is_not_a_get(client):
+    # A GET would carry the SameSite=Lax cookie on a cross-site link and spend a search.
+    response = await client.get("/words/search", params={"query": "vivir", "language": "es"})
+    assert response.status_code == 405
+
+
 async def test_search_without_mock_data_lists_the_queries_that_have_it(client):
-    response = await client.get("/words/search", params={"query": "zzz", "language": "en"})
+    response = await client.post("/words/search", json={"query": "zzz", "language": "en"})
     assert response.status_code == 200
     assert response.json()["words"] == []
     assert response.json()["mock_queries"] == ["although", "brave", "journey", "wheel"]
@@ -214,14 +220,14 @@ async def test_search_without_mock_data_lists_the_queries_that_have_it(client):
 
 async def test_search_texts_have_a_length_limit(client):
     too_long = "x" * (MAX_QUERY_LENGTH + 1)
-    search = await client.get("/words/search", params={"query": too_long, "language": "en"})
+    search = await client.post("/words/search", json={"query": too_long, "language": "en"})
     vocabulary = await client.get("/words/vocabulary", params={"query": too_long, "language": "en"})
     at_limit = await client.get("/words/vocabulary", params={"query": "x" * MAX_QUERY_LENGTH, "language": "en"})
     assert [search.status_code, vocabulary.status_code, at_limit.status_code] == [422, 422, 200]
 
 
 async def test_an_unsupported_language_is_rejected_before_the_service(client):
-    search = await client.get("/words/search", params={"query": "x", "language": "xx"})
+    search = await client.post("/words/search", json={"query": "x", "language": "xx"})
     vocabulary = await client.get("/words/vocabulary", params={"language": "xx"})
     save = await client.post("/words/save", json={"name": "x", "language": "xx", "fl": "noun", "defs": ["x"]})
     assert [search.status_code, vocabulary.status_code, save.status_code] == [422, 422, 422]
@@ -240,7 +246,7 @@ class _AnoProvider(DictionaryProvider):
 
 async def test_search_lists_the_exact_word_first(client, monkeypatch):
     monkeypatch.setitem(PROVIDERS, "es", _AnoProvider())
-    response = await client.get("/words/search", params={"query": "Año", "language": "es"})
+    response = await client.post("/words/search", json={"query": "Año", "language": "es"})
     assert [w["name"] for w in response.json()["words"]] == ["año", "ano", "bisiesto", "Año Nuevo"]
 
 
@@ -254,6 +260,6 @@ class _BrokenProvider(DictionaryProvider):
 
 async def test_search_when_the_dictionary_fails_is_a_503(client, monkeypatch):
     monkeypatch.setitem(PROVIDERS, "en", _BrokenProvider())
-    response = await client.get("/words/search", params={"query": "wheel", "language": "en"})
+    response = await client.post("/words/search", json={"query": "wheel", "language": "en"})
     assert response.status_code == 503
     assert response.json() == {"detail": "Dictionary is unavailable, try again later"}

@@ -17,7 +17,7 @@ FIXTURE_WORDS = {
 
 
 async def search(client, query, language):
-    response = await client.get("/words/search", params={"query": query, "language": language})
+    response = await client.post("/words/search", json={"query": query, "language": language})
     assert response.status_code == 200, response.text
     return response.json()["words"]
 

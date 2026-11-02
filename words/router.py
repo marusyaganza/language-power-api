@@ -22,6 +22,7 @@ from words.schemas import (
     VocabularySortBy,
     WordCreate,
     WordOut,
+    WordSearchRequest,
     WordSearchResponse,
     WordUpdate,
 )
@@ -62,14 +63,18 @@ def _http_errors():
         ) from exc
 
 
-@router.get("/search", response_model=WordSearchResponse)
+@router.post("/search", response_model=WordSearchResponse)
 async def search_words(
-    query: str = Query(max_length=MAX_QUERY_LENGTH),
-    language: Language = Query(),
+    payload: WordSearchRequest,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     """Search the dictionary, flagging words the user has already saved.
+
+    A POST although it mostly reads: where searches are limited, each one
+    uses one up. Browsers don't send the `SameSite=Lax` session cookie with a
+    cross-site POST, as they do with a link to a GET, so another site can't
+    spend a user's searches.
 
     404 if the dictionary has no entry,
     503 if the dictionary itself failed (worth retrying later).
@@ -78,7 +83,7 @@ async def search_words(
     `Retry-After`) when today's searches are used up for everyone.
     """
     with _http_errors():
-        return await service.search_words(db, current_user.id, query=query, language=language)
+        return await service.search_words(db, current_user.id, query=payload.query, language=payload.language)
 
 
 @router.get("/search-limits", response_model=SearchLimits)
