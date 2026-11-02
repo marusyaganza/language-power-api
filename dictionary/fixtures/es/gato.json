@@ -1,0 +1,51 @@
+[
+  {
+    "meta": {
+      "id": "gato",
+      "uuid": "ed164e92-13f1-45ad-bdcd-a67679dffe87",
+      "src": "spanish",
+      "section": "alpha",
+      "stems": [
+        "gato",
+        "gatos"
+      ],
+      "offensive": false,
+      "lang": "es"
+    },
+    "hwi": {
+      "hw": "gato"
+    },
+    "fl": "masculine noun",
+    "def": [
+      {
+        "sseq": [
+          [
+            [
+              "sense",
+              {
+                "dt": [
+                  [
+                    "text",
+                    "{bc}cat"
+                  ],
+                  [
+                    "vis",
+                    [
+                      {
+                        "t": "El {it}gato{/it} duerme en la ventana.",
+                        "tr": "The cat is sleeping by the window."
+                      }
+                    ]
+                  ]
+                ]
+              }
+            ]
+          ]
+        ]
+      }
+    ],
+    "shortdef": [
+      "cat"
+    ]
+  }
+]
