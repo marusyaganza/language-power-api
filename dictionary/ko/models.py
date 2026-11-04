@@ -13,31 +13,47 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from core.database import Base
 
+# The kinds of entry (the dictionary's `lexicalUnit`): word, phrase or
+# compound, idiom, proverb, grammar pattern. The last one is spelled with
+# U+2027 (‧), as in the download.
+UNITS = ("단어", "구", "관용구", "속담", "문법‧표현")
+
 
 class KrdictEntry(Base):
     """One headword with its English meanings. Never edited by the app.
 
     `senses` holds the meanings in dictionary order, each
     `{"en": "shop; store", "en_def": "A place where...", "examples": ["과일 가게.", ...]}`.
+    For a grammar pattern, `en` is only a romanization ("-geodeunnyo"); the
+    meaning is in `en_def`.
     """
 
     __tablename__ = "krdict_entries"
     __table_args__ = (
         CheckConstraint("level IN ('초급', '중급', '고급')", name="ck_krdict_entries_level"),
+        CheckConstraint("unit IN ({})".format(", ".join(f"'{u}'" for u in UNITS)), name="ck_krdict_entries_unit"),
         # Suggestions for misspelled queries (similarity search, pg_trgm).
         Index("ix_krdict_entries_word_trgm", "word", postgresql_using="gin", postgresql_ops={"word": "gin_trgm_ops"}),
-        # Lookups by a conjugated form (`query = ANY(forms)`).
+        # Lookups by another way of writing the headword (`query = ANY(forms)`).
         Index("ix_krdict_entries_forms", "forms", postgresql_using="gin"),
     )
 
-    # The dictionary's own entry id, stable across releases; not generated here.
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    # Unique and stable across releases: the id for a single word ("16391"),
+    # the id and headword for anything else ("16391:가난이 죄다"), since idioms
+    # and proverbs share the id of the word they're built on.
+    key: Mapped[str] = mapped_column(primary_key=True)
+    # The dictionary's own entry id; not unique (see `key`), not generated here.
+    id: Mapped[int] = mapped_column(index=True, autoincrement=False)
     word: Mapped[str] = mapped_column(index=True)
+    unit: Mapped[str]  # kind of entry, one of UNITS
     homonym_number: Mapped[int] = mapped_column(server_default="0")  # 0: the word has no homonyms
-    pos: Mapped[str]  # part of speech, in Korean (명사, 동사, ...)
+    pos: Mapped[str]  # part of speech, in Korean (명사, 동사, ...); 품사 없음 (none) for most non-words
     level: Mapped[str | None]  # 초급 / 중급 / 고급 (beginner / intermediate / advanced)
     pronunciation: Mapped[str | None]  # in Hangul, e.g. 가ː게
-    forms: Mapped[list[str]] = mapped_column(ARRAY(String), server_default="{}")  # conjugated forms
+    # Other ways of writing the headword, to search by: conjugated and
+    # contracted forms, and spellings of idioms and proverbs without their
+    # optional or alternative parts.
+    forms: Mapped[list[str]] = mapped_column(ARRAY(String), server_default="{}")
     senses: Mapped[list[dict]] = mapped_column(JSONB)
 
 
