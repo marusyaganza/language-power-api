@@ -7,7 +7,7 @@ tables from its XML download; the Korean provider only reads them.
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Index, String, func
+from sqlalchemy import CheckConstraint, DateTime, Index, String, func, literal_column
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -32,9 +32,7 @@ class KrdictEntry(Base):
     __table_args__ = (
         CheckConstraint("level IN ('초급', '중급', '고급')", name="ck_krdict_entries_level"),
         CheckConstraint("unit IN ({})".format(", ".join(f"'{u}'" for u in UNITS)), name="ck_krdict_entries_unit"),
-        # Suggestions for misspelled queries (similarity search, pg_trgm).
-        Index("ix_krdict_entries_word_trgm", "word", postgresql_using="gin", postgresql_ops={"word": "gin_trgm_ops"}),
-        # Lookups by another way of writing the headword (`query = ANY(forms)`).
+        # Lookups by another way of writing the headword (`forms @> ARRAY[query]`).
         Index("ix_krdict_entries_forms", "forms", postgresql_using="gin"),
     )
 
@@ -55,6 +53,23 @@ class KrdictEntry(Base):
     # optional or alternative parts.
     forms: Mapped[list[str]] = mapped_column(ARRAY(String), server_default="{}")
     senses: Mapped[list[dict]] = mapped_column(JSONB)
+
+
+def decomposed(text):
+    """SQL for `text` with each Hangul syllable split into its letters (가 → ᄀ + ᅡ)."""
+    return func.normalize(text, literal_column("NFD"))
+
+
+# Suggestions for misspelled queries (pg_trgm similarity), on the letters
+# rather than the syllables: a 2-syllable word has too few trigrams of
+# syllables for a one-letter typo to score above the 0.3 threshold (가게 vs
+# 가개: 0.2), but enough of letters (0.43).
+Index(
+    "ix_krdict_entries_word_nfd_trgm",
+    decomposed(KrdictEntry.word).label("word_nfd"),
+    postgresql_using="gin",
+    postgresql_ops={"word_nfd": "gin_trgm_ops"},
+)
 
 
 class DictionaryImport(Base):

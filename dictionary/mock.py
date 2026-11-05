@@ -10,6 +10,7 @@ elsewhere (credited in fixtures/README.md), so the browser loads them directly.
 """
 
 import json
+import unicodedata
 from dataclasses import replace
 from pathlib import Path
 
@@ -42,25 +43,28 @@ class MockDictionaryMixin:
     Put it first in the bases, before the real provider, so that provider still
     formats the responses: `class Mock(MockDictionaryMixin, RealProvider)`.
 
-    A query is trimmed and lowercased, then looked up among the fixture names;
-    it is never used as a path. A query without a fixture returns
-    `mock_queries`: every query that has one, sorted.
+    A query is trimmed, lowercased and NFC-normalized, then looked up among
+    the fixture names; it is never used as a path. A query without a fixture
+    returns `mock_queries`: every query that has one, sorted. File names are
+    NFC-normalized too: macOS may store Korean ones decomposed.
     """
 
     language: Language
 
     def __init__(self) -> None:
-        self._fixtures = {path.stem: path for path in (FIXTURES_DIR / self.language).glob("*.json")}
+        self._fixtures = {
+            unicodedata.normalize("NFC", path.stem): path for path in (FIXTURES_DIR / self.language).glob("*.json")
+        }
 
     async def fetch(self, query: str) -> SearchResult:
-        key = query.strip().lower()
+        key = unicodedata.normalize("NFC", query.strip().lower())
         if key not in self._fixtures:
             return SearchResult(mock_queries=sorted(self._fixtures))
         result = await super().fetch(key)
         result.words = [self._with_sample_media(word) for word in result.words]
         return result
 
-    async def _fetch_raw(self, query: str) -> list:
+    async def _fetch_raw(self, query: str) -> list | dict:
         return json.loads(self._fixtures[query].read_text(encoding="utf-8"))
 
     def _with_sample_media(self, word: DictionaryEntry) -> DictionaryEntry:

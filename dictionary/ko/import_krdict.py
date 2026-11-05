@@ -159,7 +159,7 @@ def _forms(entry: ET.Element, word: str) -> list[str]:
     """Other ways of writing `word`, to search by, without repeats or the word itself.
 
     Conjugated forms (활용) and their contractions (준말), then the headword's
-    spellings without its notation (`_spellings`).
+    spellings without its notation (`spellings`).
     """
     forms = []
     for form in entry.findall("WordForm"):
@@ -168,21 +168,25 @@ def _forms(entry: ET.Element, word: str) -> list[str]:
         for element in (form, *form.findall("FormRepresentation")):
             if written := _feats(element).get("writtenForm"):
                 forms.append(written)
-    forms.extend(_spellings(word))
+    forms.extend(spellings(word))
     return [form for form in dict.fromkeys(forms) if form != word]
 
 
-def _spellings(headword: str) -> list[str]:
+def spellings(headword: str, *, keep_hyphens: bool = False) -> list[str]:
     """The ways to type `headword` without the dictionary's notation, at most MAX_SPELLINGS.
 
     - `(을)` is optional: with and without it (`진땀(을) 빼다`: 진땀을 빼다, 진땀 빼다).
     - `[B/C]` lists alternatives for the word just before it
       (`빼다[뽑다/흘리다]`: 빼다, 뽑다, 흘리다).
-    - A leading or trailing `-` (grammar patterns, affixes) is left out (`-거든요`: 거든요).
+    - A leading or trailing `-` (grammar patterns, affixes) is left out
+      (`-거든요`: 거든요), unless `keep_hyphens`.
+
+    The first spelling keeps every optional part and the first alternative.
     """
-    choices = [_token_spellings(token) for token in _TOKEN.findall(headword.strip("-"))]
-    spellings = (" ".join(parts) for parts in itertools.product(*choices))
-    return list(itertools.islice(dict.fromkeys(spellings), MAX_SPELLINGS))
+    text = headword if keep_hyphens else headword.strip("-")
+    choices = [_token_spellings(token) for token in _TOKEN.findall(text)]
+    combined = (" ".join(parts) for parts in itertools.product(*choices))
+    return list(itertools.islice(dict.fromkeys(combined), MAX_SPELLINGS))
 
 
 def _token_spellings(token: str) -> list[str]:

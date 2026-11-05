@@ -36,15 +36,15 @@ class DictionaryError(Exception):
 
 
 class DictionaryProvider(ABC):
-    """One language's dictionary, backed by one external API.
+    """One language's dictionary: an external API, or data imported into our database (Korean).
 
-    Each language has its own provider, so a language can change API without
-    touching the others. The rest of the app only calls `fetch`.
+    Each language has its own provider, so a language can change source
+    without touching the others. The rest of the app only calls `fetch`.
 
     A lookup is split in two so the mock providers (`dictionary.mock`) can
     replace the request with a made-up answer and still run the real
-    parsing: `_fetch_raw` returns the API's answer as it was received (what
-    the fixtures store), and `_parse` turns it into a `SearchResult`.
+    parsing: `_fetch_raw` returns the source's answer as it was received
+    (what the fixtures store), and `_parse` turns it into a `SearchResult`.
     """
 
     language: Language
@@ -60,7 +60,7 @@ class DictionaryProvider(ABC):
 
     @abstractmethod
     async def _fetch_raw(self, query: str) -> Any:
-        """Request `query` from the API and return its answer, unparsed.
+        """Request `query` from the source and return its answer, unparsed.
 
         Raises:
             DictionaryError: as for `fetch`. The message must never contain

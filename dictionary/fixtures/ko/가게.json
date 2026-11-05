@@ -1,0 +1,22 @@
+{
+  "entries": [
+    {
+      "key": "900001",
+      "word": "가게",
+      "unit": "단어",
+      "homonym_number": 0,
+      "pos": "명사",
+      "level": "초급",
+      "pronunciation": "가ː게",
+      "forms": [],
+      "senses": [
+        {
+          "en": "shop; store",
+          "en_def": "A small place where things are sold.",
+          "examples": ["우리 집 앞에 작은 가게가 있어요.", "가게 문을 열다."]
+        }
+      ]
+    }
+  ],
+  "suggestions": []
+}

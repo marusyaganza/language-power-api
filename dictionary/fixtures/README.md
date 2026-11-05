@@ -1,18 +1,24 @@
 # Mock dictionary fixtures
 
-Dictionary entries for tests and local development (`USE_MOCKS=true`), in the JSON
-format of the Merriam-Webster Dictionary API, so the real parsing code runs on them.
-**They are made up for this project, not Merriam-Webster content:** the definitions,
-examples, pronunciations and ids were written for it. Merriam-Webster's terms don't allow
-storing or replaying its responses, so never add a recorded answer here.
+Dictionary entries for tests and local development (`USE_MOCKS=true`), in the shape each
+provider's `_fetch_raw` returns, so the real parsing code runs on them: the JSON of the
+Merriam-Webster Dictionary API for `en/` and `es/`, and rows of `krdict_entries` for `ko/`
+(`{"entries": [...], "suggestions": [...]}`, see `dictionary/ko/repository.py`).
+**They are made up for this project, not dictionary content:** the definitions, examples,
+pronunciations and ids were written for it. Merriam-Webster's terms don't allow storing or
+replaying its responses, and the Korean Learners' Dictionary is CC BY-SA, which this MIT
+repository doesn't take in, so never add a recorded answer or an imported row here. The
+Korean ids start at 900001 so they can't be mistaken for real ones.
 
 | Language | Words | Why |
 |---|---|---|
 | `en/` | `cat`, `wheel`, `brave`, `journey`, `although` | different parts of speech; `journey` has two entries (noun, verb); `cat` has audio and a picture |
 | `es/` | `gato`, `ballena`, `idioma`, `ecologista`, `vivir` | the three noun genders (feminine, masculine, both) and a verb; `gato` has audio and a picture |
+| `ko/` | `가게`, `가다`, `조용하다`, `아마`, `눈이 높다` | noun, verb, adjective, adverb and an idiom (with an optional part); `가다` has two homonyms (verb, auxiliary verb) |
 
 Four words per language is what every game needs: the multiple-choice games use four.
-One file per search query, named by the lowercased query.
+One file per search query, named by the lowercased query (Korean ones by the spelling one
+types, e.g. `눈이 높다`, not the headword `눈(이) 높다`).
 
 Unusual shapes the parser handles (`bs`, `pseq`, cross-references, illustrations, audio
 folders, malformed entries) are tested with small inline entries in

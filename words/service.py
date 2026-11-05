@@ -201,7 +201,7 @@ async def get_search_limits(db: AsyncSession, user_id: int) -> SearchLimits:
     )
 
 
-_LANGUAGE_NAMES = {Language.EN: "English", Language.ES: "Spanish"}
+_LANGUAGE_NAMES = {Language.EN: "English", Language.ES: "Spanish", Language.KO: "Korean"}
 
 
 async def _count_search(db: AsyncSession, user_id: int, language: str) -> int | None:

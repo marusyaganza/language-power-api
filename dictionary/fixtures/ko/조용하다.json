@@ -1,0 +1,22 @@
+{
+  "entries": [
+    {
+      "key": "900004",
+      "word": "조용하다",
+      "unit": "단어",
+      "homonym_number": 0,
+      "pos": "형용사",
+      "level": "중급",
+      "pronunciation": "조용하다",
+      "forms": ["조용해", "조용하니", "조용합니다"],
+      "senses": [
+        {
+          "en": "quiet; calm",
+          "en_def": "Without noise.",
+          "examples": ["도서관은 아주 조용해요."]
+        }
+      ]
+    }
+  ],
+  "suggestions": []
+}
