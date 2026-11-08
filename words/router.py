@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import get_current_user
 from core.database import get_db
-from core.language import Language
+from core.enabled_language import EnabledLanguage
 from words import service
 from words.schemas import (
     MAX_QUERY_LENGTH,
@@ -111,7 +111,7 @@ async def create_word(
 
 @router.get("/vocabulary", response_model=VocabularyPage)
 async def list_vocabulary(
-    language: Language,
+    language: EnabledLanguage,
     query: str | None = Query(default=None, max_length=MAX_QUERY_LENGTH),
     page: int = Query(default=1, ge=1),
     sort_by: VocabularySortBy = Query(default=VocabularySortBy.created_at),

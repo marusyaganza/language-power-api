@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 # Import every module that defines models, so Base.metadata knows about them.
 # Without these, autogenerate sees no tables and emits a migration that drops
 # them all. Add new model modules here.
+import dictionary.ko.models  # noqa: F401
 import games.models  # noqa: F401
 import users.models  # noqa: F401
 import words.models  # noqa: F401

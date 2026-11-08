@@ -28,7 +28,7 @@ def test_every_sample_media_word_has_a_fixture():
 
 def test_the_fixtures_link_to_no_merriam_webster_media():
     # The parser would turn `sound.audio` and `art.artid` into MW URLs.
-    for language in Language:
+    for language in (Language.EN, Language.ES):  # the Merriam-Webster languages
         for path in (FIXTURES_DIR / language).glob("*.json"):
             for entry in json.loads(path.read_text(encoding="utf-8")):
                 assert "art" not in entry, path

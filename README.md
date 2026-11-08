@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/marusyaganza/language-power-api/actions/workflows/ci.yml/badge.svg)](https://github.com/marusyaganza/language-power-api/actions/workflows/ci.yml)
 
-Third version of the Language Power application: a vocabulary trainer for English and Spanish. This repository is its backend, a FastAPI service with PostgreSQL, Redis and session-based authentication. Users look up words in Merriam-Webster dictionaries, save them to a personal vocabulary, and practise them in games scheduled by spaced repetition. I built both halves: this API and the React + TypeScript frontend, which lives in a [separate repository](https://github.com/marusyaganza/language-power-client).
+Third version of the Language Power application: a vocabulary trainer for English and Spanish, with Korean in beta. This repository is its backend, a FastAPI service with PostgreSQL, Redis and session-based authentication. Users look up words in Merriam-Webster dictionaries (and, for Korean, in a learners' dictionary imported into PostgreSQL), save them to a personal vocabulary, and practise them in games scheduled by spaced repetition. I built both halves: this API and the React + TypeScript frontend, which lives in a [separate repository](https://github.com/marusyaganza/language-power-client).
 
 ## Highlights
 
@@ -27,7 +27,7 @@ The demo is a separate deployment of the same code, open to anyone who signs up.
 - accounts, with everything in them, are deleted after 24 hours
 - up to 50 new accounts a day, and 100 saved words per account
 
-The app shows how many searches are left, and explains the limits when one is reached. Saved words and games keep working after the searches are used up.
+The app shows how many searches are left, and explains the limits when one is reached. Saved words and games keep working after the searches are used up. The demo has English and Spanish; Korean is in beta on the private deployment only.
 
 - App: [language-power.netlify.app](https://language-power.netlify.app/). Sign up with any email address; it's never contacted.
 - API documentation: [language-power.netlify.app/api/docs](https://language-power.netlify.app/api/docs). "Try it out" works with the session of the app open in the same browser.
@@ -35,6 +35,7 @@ The app shows how many searches are left, and explains the limits when one is re
 ## Features
 
 - Search English and Spanish words in Merriam-Webster dictionaries, with spelling suggestions when nothing matches
+- Korean (beta): search the Korean Learners' Dictionary, imported into PostgreSQL, with English meanings for words, phrases, idioms, proverbs and grammar patterns, found by their other forms too, and suggestions that tolerate a one-letter typo in Hangul
 - Save words to a personal vocabulary with their definitions, examples, pronunciation audio, illustrations and, for Spanish nouns, grammatical gender
 - Edit saved words, and browse the vocabulary with search, sorting and pagination
 - Practise saved words in six games: pick the meaning, pick the word, type the word, listen and type, name the picture, and noun gender (Spanish only)
@@ -57,14 +58,14 @@ Some rules hold everywhere:
 - Everything is async: SQLAlchemy 2.0 with psycopg 3, and the asyncio Redis client. CPU-bound work (bcrypt) runs in a thread so it does not block the event loop.
 - One database session per request. Relationships are never lazy-loaded: queries load what they need explicitly, and a missing load fails loudly instead of running a hidden query.
 - Data belongs to a user. A word or game session that belongs to someone else is reported exactly like one that does not exist.
-- Dictionary providers sit behind one interface, so the real Merriam-Webster clients and the mock ones are interchangeable.
+- Dictionary providers sit behind one interface, so the Merriam-Webster API clients, the Korean dictionary imported into PostgreSQL and the mock ones are interchangeable.
 
 ## Tech stack
 
 - Python 3.12
 - FastAPI, Pydantic 2 and pydantic-settings, served by Uvicorn
 - SQLAlchemy 2.0 (async) with psycopg 3, and Alembic for migrations
-- PostgreSQL 18
+- PostgreSQL 18, with pg_trgm for Korean spelling suggestions
 - Redis 7 for auth sessions and game sessions
 - httpx for the Merriam-Webster API
 - bcrypt for password hashing
@@ -82,8 +83,8 @@ Some rules hold everywhere:
 | `users/` | User model, password hashing and user lookups |
 | `words/` | Dictionary search and the saved vocabulary |
 | `games/` | Game sessions, answer grading, spaced repetition and per-user settings |
-| `dictionary/` | One provider per language (`en/`, `es/`), the shared Merriam-Webster code (`merriam_webster/`), and the mock providers. [dictionary/README.md](dictionary/README.md) lists the steps for adding a language |
-| `dictionary/fixtures/` | Made-up entries in Merriam-Webster's format, with sample audio and pictures, for tests and local development ([fixtures/README.md](dictionary/fixtures/README.md)) |
+| `dictionary/` | One provider per language (`en/`, `es/`, `ko/`), the shared Merriam-Webster code (`merriam_webster/`), and the mock providers. `ko/` also holds the Korean tables and their import script ([ko/README.md](dictionary/ko/README.md)). [dictionary/README.md](dictionary/README.md) lists the steps for adding a language |
+| `dictionary/fixtures/` | Made-up entries in each source's format, with sample audio and pictures, for tests and local development ([fixtures/README.md](dictionary/fixtures/README.md)) |
 | `alembic/` | Database migrations |
 | `tests/` | Unit tests (`tests/unit`) and API tests against real Postgres and Redis (`tests/api`) |
 | `docs/` | Games API documentation, every setting (`configuration.md`) and the diagrams |
@@ -95,6 +96,7 @@ Some rules hold everywhere:
 - Python 3.12
 - [Docker](https://docs.docker.com/get-docker/), for PostgreSQL and Redis through the included `docker-compose.yml` (or servers of your own)
 - _(Optional)_ [Merriam-Webster API](https://dictionaryapi.com) keys for Merriam-Webster's Collegiate® Dictionary and Spanish-English Dictionary. In mock mode the app uses a few made-up entries instead, so no keys are needed.
+- _(Optional)_ The Korean dictionary's XML download, to search real Korean words outside mock mode. It needs no key; [dictionary/ko/README.md](dictionary/ko/README.md) shows how to import it.
 
 ## Local development setup
 
@@ -137,7 +139,7 @@ Some rules hold everywhere:
    uvicorn main:app --reload
    ```
 
-   The API runs on `http://localhost:8000`, with interactive documentation at `http://localhost:8000/docs`. Sign up through `POST /auth/signup` or the frontend, then search for one of the mocked words, `cat`, `wheel`, `brave`, `journey` or `although` in English, `gato`, `ballena`, `idioma`, `ecologista` or `vivir` in Spanish. A search for any other word returns the list of mocked ones. `cat` and `gato` have audio and a picture, loaded straight from Wikimedia Commons and Lorem Picsum, so they need an internet connection.
+   The API runs on `http://localhost:8000`, with interactive documentation at `http://localhost:8000/docs`. Sign up through `POST /auth/signup` or the frontend, then search for one of the mocked words, `cat`, `wheel`, `brave`, `journey` or `although` in English, `gato`, `ballena`, `idioma`, `ecologista` or `vivir` in Spanish, `가게`, `가다`, `조용하다`, `아마` or `눈이 높다` in Korean. A search for any other word returns the list of mocked ones. `cat` and `gato` have audio and a picture, loaded straight from Wikimedia Commons and Lorem Picsum, so they need an internet connection.
 
 ### Database migrations
 
@@ -167,7 +169,8 @@ pytest tests/unit      # unit tests only, no database or Redis needed
 pytest --cov           # with a coverage report (configured in .coveragerc)
 ```
 
-- **Unit tests** cover the pure logic: scoring, spaced repetition, hints, multiple-choice options, word selection, schemas and the Merriam-Webster parsing.
+- **Unit tests** cover the pure logic: scoring, spaced repetition, hints, multiple-choice options, word selection, schemas, the Merriam-Webster parsing, and reading and formatting the Korean dictionary.
+- The Korean import and searches are tested against PostgreSQL with made-up XML and rows, among the API tests.
 - **API tests** call the app over HTTP and need PostgreSQL and Redis from `docker compose up -d`. They create a separate `language_app_test` database and run every migration on it, so the migrations are tested too. Each test runs in a transaction that is rolled back afterwards, and Redis database 15 is flushed after each test, so the development data is never touched.
 - Tests always use the mock dictionaries, whatever `.env` says, and need no API keys.
 
@@ -221,13 +224,16 @@ The browser only ever talks to the Netlify origin, so the session cookie stays f
 
 Definitions, examples, pronunciation audio and illustrations come from the [Merriam-Webster Dictionary API](https://dictionaryapi.com): Merriam-Webster's Collegiate® Dictionary and Spanish-English Dictionary, © Merriam-Webster Inc. They are fetched live when a user searches and never stored in this repository. This project is not affiliated with or endorsed by Merriam-Webster Inc.
 
+Korean entries are adapted from the [Korean Learners' Dictionary (한국어기초사전)](https://krdict.korean.go.kr) of the National Institute of Korean Language, licensed under [CC BY-SA 2.0 KR](https://creativecommons.org/licenses/by-sa/2.0/kr/): its text is imported into each deployment's database, reformatted, with English parts of speech and selected fields, and credited in the app. Its pictures and recordings aren't openly licensed and aren't used. None of it is stored in this repository; the Korean fixtures are made up. This project is not affiliated with or endorsed by the National Institute of Korean Language.
+
 ## Limitations
 
 - The personal deployment is private and signup is closed. The demo has open signup but strict limits (see [Demo](#demo)).
 - Real dictionary lookups need your own Merriam-Webster API keys; mock mode only knows four made-up words per language.
+- Korean is in beta, on the private deployment only. A conjugated form the dictionary doesn't list (먹었어요 for 먹다) isn't found yet, and Korean entries have no audio or pictures of their own.
 - Rate limits are counted in memory, which is exact only because each deployment runs a single instance.
 - The data model may still change.
 
 ## License
 
-[MIT](LICENSE). It covers this repository only, not the Merriam-Webster content the app fetches (see [Dictionary data](#dictionary-data)).
+[MIT](LICENSE). It covers this repository only, not the dictionary content the app fetches or imports (see [Dictionary data](#dictionary-data)).

@@ -1,0 +1,44 @@
+{
+  "entries": [
+    {
+      "key": "900002",
+      "word": "가다",
+      "unit": "단어",
+      "homonym_number": 1,
+      "pos": "동사",
+      "level": "초급",
+      "pronunciation": "가다",
+      "forms": ["가", "가서", "갑니다"],
+      "senses": [
+        {
+          "en": "go",
+          "en_def": "To move from here to another place.",
+          "examples": ["주말에 친구와 바다에 가요."]
+        },
+        {
+          "en": "go; pass",
+          "en_def": "For time to go by.",
+          "examples": []
+        }
+      ]
+    },
+    {
+      "key": "900003",
+      "word": "가다",
+      "unit": "단어",
+      "homonym_number": 2,
+      "pos": "보조 동사",
+      "level": "중급",
+      "pronunciation": "가다",
+      "forms": ["가", "가서"],
+      "senses": [
+        {
+          "en": "keep on",
+          "en_def": "Used after another verb to show that an action goes on.",
+          "examples": ["일이 잘 되어 가요."]
+        }
+      ]
+    }
+  ],
+  "suggestions": []
+}

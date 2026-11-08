@@ -52,7 +52,7 @@ async def test_searches_are_unlimited_by_default(client):
     assert response.status_code == 200
     assert response.json()["searches_left"] is None
     limits = (await client.get("/words/search-limits")).json()
-    assert limits == {"limit": None, "searches_left": {"en": None, "es": None}}
+    assert limits == {"limit": None, "searches_left": {"en": None, "es": None, "ko": None}}
 
 
 async def test_each_account_has_its_own_searches_per_language(client, make_client, monkeypatch, lookups):
@@ -72,7 +72,7 @@ async def test_each_account_has_its_own_searches_per_language(client, make_clien
     assert (await search(other)).status_code == 200
 
     limits = (await client.get("/words/search-limits")).json()
-    assert limits == {"limit": 2, "searches_left": {"en": 0, "es": 1}}
+    assert limits == {"limit": 2, "searches_left": {"en": 0, "es": 1, "ko": 2}}
 
 
 async def test_a_search_with_no_results_still_counts(client, monkeypatch):

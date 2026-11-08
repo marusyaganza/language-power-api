@@ -4,7 +4,7 @@ from itertools import pairwise
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from core.language import Language
+from core.enabled_language import EnabledLanguage
 from games.scoring import AnswerGrade
 from games.spaced_repetition import DEFAULT_CONFIG
 from words.schemas import ExampleItem
@@ -49,7 +49,7 @@ class QuestionOut(BaseModel):
 
 
 class GameSessionCreate(BaseModel):
-    language: Language
+    language: EnabledLanguage
     mode: GameMode = GameMode.SPACED
     new_words_first: bool = False  # words never practiced in this game first
 

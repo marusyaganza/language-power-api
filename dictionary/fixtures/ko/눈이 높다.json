@@ -1,0 +1,22 @@
+{
+  "entries": [
+    {
+      "key": "900006:눈(이) 높다",
+      "word": "눈(이) 높다",
+      "unit": "관용구",
+      "homonym_number": 0,
+      "pos": "품사 없음",
+      "level": null,
+      "pronunciation": null,
+      "forms": ["눈이 높다", "눈 높다"],
+      "senses": [
+        {
+          "en": "have high standards",
+          "en_def": "To expect only the best of things or people.",
+          "examples": ["그 사람은 눈이 높아서 아무 옷이나 사지 않아요."]
+        }
+      ]
+    }
+  ],
+  "suggestions": []
+}

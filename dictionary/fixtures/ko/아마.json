@@ -1,0 +1,22 @@
+{
+  "entries": [
+    {
+      "key": "900005",
+      "word": "아마",
+      "unit": "단어",
+      "homonym_number": 0,
+      "pos": "부사",
+      "level": "초급",
+      "pronunciation": "아마",
+      "forms": [],
+      "senses": [
+        {
+          "en": "probably; maybe",
+          "en_def": "Used when guessing something that is likely.",
+          "examples": ["내일은 아마 비가 올 거예요."]
+        }
+      ]
+    }
+  ],
+  "suggestions": []
+}

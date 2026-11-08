@@ -34,6 +34,7 @@ os.environ.update(
 
 from dictionary.en.mock import MockEnglishDictionaryProvider  # noqa: E402
 from dictionary.es.mock import MockSpanishDictionaryProvider  # noqa: E402
+from dictionary.ko.mock import MockKoreanDictionaryProvider  # noqa: E402
 from dictionary.providers import PROVIDERS  # noqa: E402
 
 # Stop the whole run if the override did not take effect, instead of letting
@@ -41,5 +42,6 @@ from dictionary.providers import PROVIDERS  # noqa: E402
 if not (
     isinstance(PROVIDERS["en"], MockEnglishDictionaryProvider)
     and isinstance(PROVIDERS["es"], MockSpanishDictionaryProvider)
+    and isinstance(PROVIDERS["ko"], MockKoreanDictionaryProvider)
 ):
     raise RuntimeError(f"Tests must use mock dictionary providers, got {PROVIDERS}")
