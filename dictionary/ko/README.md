@@ -2,7 +2,7 @@
 
 Korean words come from the [Korean Learners' Dictionary (한국어기초사전)](https://krdict.korean.go.kr) of the National Institute of Korean Language: about 55,000 entries written for learners, each with English translations and definitions, and a level (초급 beginner, 중급 intermediate, 고급 advanced).
 
-Unlike English and Spanish, Korean has no API to call. The dictionary's site and Open API aren't reachable from outside Korea, so its full download is imported into PostgreSQL and searched there. Korean is in **beta**, on the private deployment only.
+Unlike English and Spanish, Korean doesn't call an API. The dictionary has an Open API, but neither it nor the site is reachable through the VPN I use, and I don't go online without it while travelling. So its full download is imported into PostgreSQL and searched there, and searches don't depend on the site at all. Korean is in **beta**, on the private deployment only.
 
 ## Files
 
@@ -14,9 +14,9 @@ Unlike English and Spanish, Korean has no API to call. The dictionary's site and
 
 ## The data and its license
 
-- **Source:** the dictionary's own "full download" (사전 전체 내려받기), XML, mirrored on GitHub at [spellcheck-ko/korean-dict-nikl](https://github.com/spellcheck-ko/korean-dict-nikl) (folder `krdict/`, 11 files of about 35 MB). The mirror is kept by a Debian developer for the Korean spellchecker; it only unzips and renames the official files. The release currently imported is 2026-06-19, mirror commit `009b480a`.
-- **License:** the text is [CC BY-SA 2.0 KR](https://creativecommons.org/licenses/by-sa/2.0/kr/). The client credits the dictionary wherever Korean entries are shown, and says they're adapted.
-- **Not used:** pictures, video and pronunciation recordings have their own terms and aren't openly licensed, so they're neither imported nor linked.
+- **Source:** the dictionary's own "full download" (사전 전체 내려받기), XML, mirrored on GitHub at [spellcheck-ko/korean-dict-nikl](https://github.com/spellcheck-ko/korean-dict-nikl) (folder `krdict/`, 11 files of about 35 MB). The mirror belongs to the `spellcheck-ko` project and says it isn't run by the National Institute of Korean Language. Its [`update.py`](https://github.com/spellcheck-ko/korean-dict-nikl/blob/009b480a924c5c4b7ed83635769da6c519fc7ab3/krdict/update.py) only unzips the official download and renames its files (`1_5000_<date>.xml` becomes `001.xml`); the XML itself isn't changed. The release currently imported is 2026-06-19, mirror commit `009b480a`.
+- **License:** the text is [CC BY-SA 2.0 KR](https://creativecommons.org/licenses/by-sa/2.0/kr/), as the dictionary's [copyright policy](https://krdict.korean.go.kr/kor/kboardPolicy/copyRightTermsInfo) says of everything on the site not marked otherwise: free to use, commercially too, with credit to the author, and adapted work under the same license. The client credits the dictionary wherever Korean entries are shown, and says they're adapted.
+- **Not used:** the same policy says pictures, video, sound and pronunciation recordings have their own terms, set file by file. So they're neither imported nor linked.
 - **Never in this repository:** the repository is MIT, so the data lives only in the databases. The fixtures in `dictionary/fixtures/ko/` are made up.
 
 ## What is imported
