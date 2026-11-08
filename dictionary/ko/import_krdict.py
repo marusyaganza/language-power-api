@@ -10,7 +10,7 @@ either the old release or the new one.
 
 Every kind of entry is kept (words, phrases, idioms, proverbs, grammar
 patterns) if it has an English meaning, without its media (pictures and
-recordings are not openly licensed). The text is CC BY-SA 2.0 KR.
+recordings have their own terms, set file by file). The text is CC BY-SA 2.0 KR.
 """
 
 import argparse

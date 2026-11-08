@@ -1,8 +1,8 @@
 """Korean: the Korean Learners' Dictionary (한국어기초사전), imported into our database.
 
-Unlike the other languages, there is no API to call: the National Institute
-of Korean Language's site isn't reachable from abroad, so its full download is
-imported (`python -m dictionary.ko.import_krdict`) and searched here.
+Unlike the other languages, it doesn't call an API: the dictionary's Open API
+and site aren't reachable through the VPN I use (see README.md), so its full
+download is imported (`python -m dictionary.ko.import_krdict`) and searched here.
 """
 
 import unicodedata
