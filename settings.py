@@ -3,6 +3,8 @@ from typing import Self
 from pydantic import Field, PositiveInt, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from core.language import Language
+
 
 class Settings(BaseSettings):
     # True: dictionary lookups read made-up responses (dictionary/fixtures)
@@ -10,6 +12,12 @@ class Settings(BaseSettings):
     use_mocks: bool = False
     english_api_key: SecretStr | None = None
     spanish_api_key: SecretStr | None = None
+
+    # The languages this deployment offers, as JSON in the environment:
+    # ENABLED_LANGUAGES='["en", "es"]'. Requests in any other language are
+    # rejected, and /auth/config tells the frontend which to show. Every
+    # language by default; the demo leaves out Korean while it's in beta.
+    enabled_languages: list[Language] = Field(default_factory=lambda: list(Language), min_length=1)
 
     database_url: str = "postgresql+psycopg://app_user:dev_password@localhost:5432/language_app"
     signup_enabled: bool = True

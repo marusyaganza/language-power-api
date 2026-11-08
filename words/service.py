@@ -187,17 +187,18 @@ async def search_words(db: AsyncSession, user_id: int, *, query: str, language: 
 
 
 async def get_search_limits(db: AsyncSession, user_id: int) -> SearchLimits:
-    """The per-account search limit, and how many searches the user has left in each language.
+    """The per-account search limit, and how many searches the user has left in each language offered.
 
     Without a limit (`settings.searches_per_language` unset), both are None.
     """
     limit = settings.searches_per_language
+    languages = settings.enabled_languages
     if limit is None:
-        return SearchLimits(limit=None, searches_left={language: None for language in Language})
+        return SearchLimits(limit=None, searches_left={language: None for language in languages})
     counts = await repository.get_search_counts(db, user_id)
     return SearchLimits(
         limit=limit,
-        searches_left={language: max(limit - counts.get(language, 0), 0) for language in Language},
+        searches_left={language: max(limit - counts.get(language, 0), 0) for language in languages},
     )
 
 

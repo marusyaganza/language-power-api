@@ -7,6 +7,7 @@ Settings are read from the environment, then from `.env`. Names are case-insensi
 | `DATABASE_URL` | local `docker-compose.yml` database | PostgreSQL URL; must use the `postgresql+psycopg://` driver |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis URL; `rediss://user:password@host:port` for TLS |
 | `USE_MOCKS` | `false` | `true` serves made-up dictionary entries (tests and local development); `false` calls the real Merriam-Webster API |
+| `ENABLED_LANGUAGES` | every language | JSON list of the languages this deployment offers, e.g. `["en", "es"]`. Requests in any other language are rejected (422), and `GET /auth/config` lists these for the frontend |
 | `ENGLISH_API_KEY`, `SPANISH_API_KEY` | none | Merriam-Webster keys; required when `USE_MOCKS` is `false` |
 | `SIGNUP_ENABLED` | `true` | Whether `POST /auth/signup` creates accounts |
 | `COOKIE_SECURE` | `false` | Send the session cookie over HTTPS only; `true` in production |

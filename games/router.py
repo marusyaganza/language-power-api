@@ -11,14 +11,13 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    Query,
     status,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import get_current_user
 from core.database import get_db
-from core.language import Language
+from core.enabled_language import EnabledLanguage
 from games import service
 from games.schemas import (
     AnswerRequest,
@@ -64,7 +63,9 @@ def _http_errors():
 
 @router.get("", response_model=list[GameOut])
 async def list_games(
-    language: Language = Query(...),
+    # A plain required parameter: with `= Query(...)`, FastAPI (0.141) drops
+    # EnabledLanguage's validator and accepts languages the deployment doesn't offer.
+    language: EnabledLanguage,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

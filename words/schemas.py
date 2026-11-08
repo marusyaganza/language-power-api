@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, BeforeValidator, Field, field_validator
 
+from core.enabled_language import EnabledLanguage
 from core.language import Language
 from dictionary.entry import unique_definitions
 
@@ -67,7 +68,7 @@ class ExampleIn(BaseModel):
 class WordCreate(BaseModel):
     uuid: str | None = Field(default=None, max_length=MAX_UUID_LENGTH)
     name: str = Field(max_length=MAX_NAME_LENGTH)
-    language: Language
+    language: EnabledLanguage
     stems: list[Stem] = Field(default=[], max_length=MAX_STEMS)
     defs: list[Definition] = Field(min_length=1, max_length=MAX_DEFINITIONS)
     fl: str = Field(max_length=MAX_FL_LENGTH)
@@ -146,7 +147,7 @@ class WordUpdate(BaseModel):
 
 class WordSearchRequest(BaseModel):
     query: str = Field(max_length=MAX_QUERY_LENGTH)
-    language: Language
+    language: EnabledLanguage
 
 
 class WordSearchResponse(BaseModel):

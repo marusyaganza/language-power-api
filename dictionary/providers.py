@@ -8,13 +8,16 @@ from settings import settings
 
 
 def build_providers():
+    """A provider for each language the deployment offers (`settings.enabled_languages`)."""
     if settings.use_mocks:
-        return {
-            "en": MockEnglishDictionaryProvider(),
-            "es": MockSpanishDictionaryProvider(),
-            "ko": MockKoreanDictionaryProvider(),
+        providers = {
+            "en": MockEnglishDictionaryProvider,
+            "es": MockSpanishDictionaryProvider,
+            "ko": MockKoreanDictionaryProvider,
         }
-    return {"en": EnglishDictionaryProvider(), "es": SpanishDictionaryProvider(), "ko": KoreanDictionaryProvider()}
+    else:
+        providers = {"en": EnglishDictionaryProvider, "es": SpanishDictionaryProvider, "ko": KoreanDictionaryProvider}
+    return {language: provider() for language, provider in providers.items() if language in settings.enabled_languages}
 
 
 PROVIDERS = build_providers()
