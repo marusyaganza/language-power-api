@@ -3,6 +3,7 @@ from typing import Self
 from pydantic import Field, PositiveInt, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from core.audio_engine import AudioEngine
 from core.language import Language
 
 
@@ -77,6 +78,14 @@ class Settings(BaseSettings):
     # Saved words per account.
     max_words_per_user: PositiveInt | None = None
 
+    # Audio generation, for private deployments only (see the check below).
+    # The engines offered, as JSON in the environment: AUDIO_ENGINES='["google"]'.
+    # Empty (the default) turns the feature off, and /auth/config tells the
+    # frontend which to show.
+    audio_engines: list[AudioEngine] = []
+    # The Cloud Storage bucket generated audio is uploaded to (public read).
+    media_bucket: str | None = None
+
     # Error reporting (core.sentry). No DSN: nothing is sent.
     sentry_dsn: SecretStr | None = None
     sentry_environment: str = "local"  # "demo" on the demo, the only deployment with a DSN
@@ -90,6 +99,24 @@ class Settings(BaseSettings):
         missing = [name.upper() for name in ("english_api_key", "spanish_api_key") if getattr(self, name) is None]
         if not self.use_mocks and missing:
             raise ValueError(f"{', '.join(missing)} must be set when USE_MOCKS is off")
+        return self
+
+    @model_validator(mode="after")
+    def audio_only_on_private_deployments(self) -> Self:
+        """Refuse to start with audio generation on a public deployment.
+
+        Every generation costs money and bucket writes, and nothing limits
+        strangers' use of it. Open signup with real APIs is the public demo;
+        with mocks (tests, local development) nothing is paid for.
+        """
+        if not self.audio_engines or self.use_mocks:
+            return self
+        if self.signup_enabled:
+            raise ValueError(
+                "Audio generation is for private deployments only: turn off AUDIO_ENGINES or SIGNUP_ENABLED"
+            )
+        if not self.media_bucket:
+            raise ValueError("MEDIA_BUCKET must be set when AUDIO_ENGINES is on and USE_MOCKS is off")
         return self
 
 
