@@ -29,6 +29,10 @@ os.environ.update(
         "ROOT_PATH": "",
         # Tests read /docs and /openapi.json, even with DOCS_ENABLED=false in `.env`.
         "DOCS_ENABLED": "true",
+        # Audio generation off and no bucket, even if `.env` turns them on;
+        # tests that need them set them.
+        "AUDIO_ENGINES": "[]",
+        "MEDIA_BUCKET": "",
     }
 )
 
@@ -45,3 +49,10 @@ if not (
     and isinstance(PROVIDERS["ko"], MockKoreanDictionaryProvider)
 ):
     raise RuntimeError(f"Tests must use mock dictionary providers, got {PROVIDERS}")
+
+from audio.mock import MockGoogleSpeechSynthesizer  # noqa: E402
+from audio.synthesizers import SYNTHESIZERS  # noqa: E402
+
+# The same for text-to-speech: tests never call Google.
+if not all(isinstance(synthesizer, MockGoogleSpeechSynthesizer) for synthesizer in SYNTHESIZERS.values()):
+    raise RuntimeError(f"Tests must use mock speech synthesizers, got {SYNTHESIZERS}")
