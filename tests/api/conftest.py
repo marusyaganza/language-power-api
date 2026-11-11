@@ -27,6 +27,7 @@ from sqlalchemy.pool import NullPool
 
 import auth.dependencies
 import auth.service
+import core.pending_media
 import games.session_store
 from auth.rate_limit import AttemptLimiter
 from core.database import AsyncSessionLocal, get_db
@@ -89,6 +90,7 @@ async def redis(monkeypatch):
     client = aioredis.from_url(settings.redis_url, decode_responses=True)
     monkeypatch.setattr(auth.service, "redis_client", client)
     monkeypatch.setattr(games.session_store, "redis_client", client)
+    monkeypatch.setattr(core.pending_media, "redis_client", client)
     try:
         yield client
     finally:

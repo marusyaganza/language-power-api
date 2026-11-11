@@ -3,10 +3,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from auth.dependencies import limit_requests_per_ip
 from auth.router import auth_router
 from core.database import engine
+from core.media_storage import LOCAL_MEDIA_DIR, STORAGE, LocalFolderStorage
 from core.proxy_signature import require_proxy_signature
 from core.redis import redis_client
 from core.sentry import init_sentry
@@ -63,6 +65,13 @@ async def health():
     nothing and costs no database or Redis calls.
     """
     return {"status": "ok"}
+
+
+# Local development without a bucket: generated files are written to a local
+# folder (core.media_storage) and served from here. Never in production, which
+# always has MEDIA_BUCKET when audio is on.
+if isinstance(STORAGE, LocalFolderStorage):
+    app.mount("/media", StaticFiles(directory=LOCAL_MEDIA_DIR, check_dir=False), name="media")
 
 
 if settings.cors_origins:
