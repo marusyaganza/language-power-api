@@ -5,6 +5,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from audio.router import router as audio_router
 from auth.dependencies import limit_requests_per_ip
 from auth.router import auth_router
 from core.database import engine
@@ -55,6 +56,7 @@ app.include_router(words_router, dependencies=_from_proxy)
 app.include_router(auth_router, dependencies=_from_proxy)
 app.include_router(games_router, dependencies=_from_proxy)
 app.include_router(game_settings_router, dependencies=_from_proxy)
+app.include_router(audio_router, dependencies=_from_proxy)
 
 
 @app.get("/health", include_in_schema=False)
