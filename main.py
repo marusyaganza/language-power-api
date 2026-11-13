@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -17,6 +18,13 @@ from games.router import router as games_router
 from games.router import settings_router as game_settings_router
 from settings import settings
 from words.router import router as words_router
+
+# The app's own log lines go to stderr, which Cloud Run keeps as logs. Without
+# this, Python drops everything below WARNING. Warnings only, as for libraries
+# (httpx logs every request at INFO), except the audio module's one INFO line
+# per generation, kept for comparing engines.
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s:     %(name)s: %(message)s")
+logging.getLogger("audio").setLevel(logging.INFO)
 
 # Before the app is created, so Sentry's FastAPI integration sees all of it.
 init_sentry(settings)

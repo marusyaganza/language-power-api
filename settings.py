@@ -1,7 +1,8 @@
-from typing import Self
+import json
+from typing import Annotated, Self
 
-from pydantic import Field, PositiveInt, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, PositiveInt, SecretStr, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from core.audio_engine import AudioEngine
 from core.language import Language
@@ -81,8 +82,9 @@ class Settings(BaseSettings):
     # Audio generation, for private deployments only (see the check below).
     # The engines offered, as JSON in the environment: AUDIO_ENGINES='["google"]'.
     # Empty (the default) turns the feature off, and /auth/config tells the
-    # frontend which to show.
-    audio_engines: list[AudioEngine] = []
+    # frontend which to show. `AUDIO_ENGINES=` with no value also means off
+    # (NoDecode: read as text, then parsed below, so it isn't invalid JSON).
+    audio_engines: Annotated[list[AudioEngine], NoDecode] = []
     # The Cloud Storage bucket generated audio is uploaded to (public read).
     media_bucket: str | None = None
 
@@ -100,6 +102,14 @@ class Settings(BaseSettings):
         if not self.use_mocks and missing:
             raise ValueError(f"{', '.join(missing)} must be set when USE_MOCKS is off")
         return self
+
+    @field_validator("audio_engines", mode="before")
+    @classmethod
+    def audio_engines_from_text(cls, value):
+        """The environment's text: JSON, or nothing at all for "off"."""
+        if isinstance(value, str):
+            return json.loads(value) if value.strip() else []
+        return value
 
     @model_validator(mode="after")
     def audio_only_on_private_deployments(self) -> Self:
