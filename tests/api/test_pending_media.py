@@ -1,12 +1,15 @@
 # tests/api/test_pending_media.py
 """Generated files held in Redis until their word is saved, and the local /media folder."""
 
+import contextlib
 import uuid
 
 import pytest
 
+import main
 from core import pending_media
-from core.media_storage import LOCAL_MEDIA_DIR, LOCAL_MEDIA_URL, LocalFolderStorage
+from core.media_storage import LOCAL_MEDIA_DIR, LocalFolderStorage
+from settings import settings
 
 pytestmark = pytest.mark.anyio
 
@@ -64,17 +67,25 @@ async def test_an_unknown_token_is_none(redis):
 # --------------------------------------------------------------------------- #
 
 
-async def test_a_locally_stored_file_is_served_at_its_url(make_client):
+@pytest.mark.parametrize("root_path", ["", "/api"])
+async def test_a_locally_stored_file_is_served_at_its_url(make_client, monkeypatch, root_path):
+    # Behind ROOT_PATH=/api (a developer's .env), the mount only finds files under /api/media.
+    monkeypatch.setattr(settings, "root_path", root_path)
+    monkeypatch.setattr(main.app, "root_path", root_path)
     path = f"test/{uuid.uuid4().hex}.mp3"
     url = await LocalFolderStorage().upload(MP3, path, "audio/mpeg")
     try:
-        response = await make_client().get(url.removeprefix(LOCAL_MEDIA_URL.removesuffix("/media")))
+        assert url.startswith(f"http://localhost:8000{root_path}/media/")
+        response = await make_client().get(url.removeprefix("http://localhost:8000"))
 
         assert response.status_code == 200
         assert response.content == MP3
     finally:
         (LOCAL_MEDIA_DIR / path).unlink()
         (LOCAL_MEDIA_DIR / "test").rmdir()
+        # Only if it's empty: local development may have files there.
+        with contextlib.suppress(OSError):
+            LOCAL_MEDIA_DIR.rmdir()
 
 
 async def test_a_missing_local_file_is_a_404(make_client):

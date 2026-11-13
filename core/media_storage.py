@@ -25,10 +25,19 @@ from google.cloud import storage
 
 from settings import settings
 
-# The repository's own local-media/ folder (gitignored), served by main.py at
-# LOCAL_MEDIA_URL: port 8000 is where the Vite dev proxy sends /api.
+# The repository's own local-media/ folder (gitignored), served by main.py under
+# /media on port 8000, where the Vite dev proxy sends /api.
 LOCAL_MEDIA_DIR = Path(__file__).resolve().parents[1] / "local-media"
-LOCAL_MEDIA_URL = "http://localhost:8000/media"
+
+
+def local_media_url() -> str:
+    """Where the app serves LOCAL_MEDIA_DIR, with `ROOT_PATH` in front.
+
+    Routes answer with or without that prefix, but the /media mount finds
+    files only with it: behind ROOT_PATH=/api, /media/x is a 404 and
+    /api/media/x the file.
+    """
+    return f"http://localhost:8000{settings.root_path}/media"
 
 
 class StorageError(Exception):
@@ -94,9 +103,9 @@ class CloudStorage(MediaStorage):
 class LocalFolderStorage(MediaStorage):
     """Files in a local folder, served by the app (local development only)."""
 
-    def __init__(self, folder: Path = LOCAL_MEDIA_DIR, base_url: str = LOCAL_MEDIA_URL):
+    def __init__(self, folder: Path = LOCAL_MEDIA_DIR, base_url: str | None = None):
         self.folder = folder
-        self.base_url = base_url
+        self.base_url = base_url if base_url is not None else local_media_url()
 
     async def upload(self, data: bytes, path: str, content_type: str) -> str:
         await asyncio.to_thread(self._write, data, path)

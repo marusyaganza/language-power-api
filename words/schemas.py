@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator, Field, field_validator
+from pydantic import AfterValidator, BaseModel, BeforeValidator, Field, field_validator, model_validator
 
 from core.enabled_language import EnabledLanguage
 from core.language import Language
@@ -25,6 +25,7 @@ MAX_EXAMPLE_LENGTH = 500  # the text and the translation each
 MAX_TRANSCRIPTION_LENGTH = 100
 MAX_IMG_DESC_LENGTH = 1000
 MAX_URL_LENGTH = 2048
+MAX_AUDIO_TOKEN_LENGTH = 64  # core.pending_media's tokens are 43 characters
 # The search text of /words/search and /words/vocabulary.
 MAX_QUERY_LENGTH = 100
 
@@ -133,6 +134,9 @@ class WordUpdate(BaseModel):
     audio_url: OptionalUrl = Field(default=None, max_length=MAX_URL_LENGTH)
     img_url: OptionalUrl = Field(default=None, max_length=MAX_URL_LENGTH)
     img_desc: OptionalStr = Field(default=None, max_length=MAX_IMG_DESC_LENGTH)
+    # The `token` from POST /audio/generate: saves that audio as the word's own
+    # (`audio_url` is then set by the server, so it can't be sent too).
+    audio_token: str | None = Field(default=None, max_length=MAX_AUDIO_TOKEN_LENGTH, pattern=r"^[A-Za-z0-9_-]+$")
 
     @field_validator("defs")
     @classmethod
@@ -143,6 +147,12 @@ class WordUpdate(BaseModel):
         if not cleaned:
             raise ValueError("Definitions must contain at least one non-empty string")
         return unique_definitions(cleaned)
+
+    @model_validator(mode="after")
+    def audio_token_or_audio_url(self):
+        if self.audio_token is not None and "audio_url" in self.model_fields_set:
+            raise ValueError("Send either audio_token or audio_url, not both")
+        return self
 
 
 class WordSearchRequest(BaseModel):

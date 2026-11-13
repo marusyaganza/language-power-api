@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from audio import synthesizers
 from audio.base import SpeechError, SpeechTimeoutError, UnknownVoiceError
-from core import pending_media
+from core import media_storage, pending_media
 from core.audio_engine import AudioEngine
 from core.language import Language
 from settings import settings
@@ -100,3 +100,29 @@ async def generate(user_id: int, language: Language, text: str, engine: AudioEng
     meta = {"engine": engine.value, "voice": voice, "language": language.value, "text": text}
     token = await pending_media.hold(PENDING_KIND, user_id, audio, meta)
     return Generation(token=token, audio=audio, engine=engine, voice=voice)
+
+
+async def held_generation(user_id: int, token: str) -> pending_media.HeldFile | None:
+    """The user's generation held under `token`, or None if it expired or never existed."""
+    return await pending_media.get(PENDING_KIND, user_id, token)
+
+
+async def store_generation(held: pending_media.HeldFile) -> str:
+    """Upload a held generation for good and return its public URL.
+
+    The path is `audio/<language>/<engine>/<sha256>.mp3`: the engine in the
+    path says later where a word's audio came from.
+
+    Raises:
+        StorageError: there is no storage, or the upload failed.
+    """
+    storage = media_storage.STORAGE
+    if storage is None:
+        raise media_storage.StorageError("No media storage is configured")
+    folder = f"audio/{held.meta['language']}/{held.meta['engine']}"
+    return await storage.upload(held.data, media_storage.hashed_path(folder, held.data, "mp3"), "audio/mpeg")
+
+
+async def discard_generation(user_id: int, token: str) -> None:
+    """Stop holding a generation once the word is saved with it."""
+    await pending_media.discard(PENDING_KIND, user_id, token)
