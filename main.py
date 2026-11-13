@@ -64,7 +64,8 @@ app.include_router(words_router, dependencies=_from_proxy)
 app.include_router(auth_router, dependencies=_from_proxy)
 app.include_router(games_router, dependencies=_from_proxy)
 app.include_router(game_settings_router, dependencies=_from_proxy)
-app.include_router(audio_router, dependencies=_from_proxy)
+# Listed in /docs only where audio generation is on: elsewhere every /audio route is a 404.
+app.include_router(audio_router, dependencies=_from_proxy, include_in_schema=bool(settings.audio_engines))
 
 
 @app.get("/health", include_in_schema=False)

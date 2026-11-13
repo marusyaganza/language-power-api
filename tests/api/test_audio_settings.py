@@ -1,6 +1,7 @@
 # tests/api/test_audio_settings.py
 """Audio generation is off by default and can't be turned on for the public demo."""
 
+import json
 import os
 import subprocess
 import sys
@@ -118,3 +119,27 @@ def test_the_audio_log_line_reaches_the_logs_and_library_chatter_doesnt():
     assert "Audio generated: engine=google" in result.stderr
     assert "Dictionary lookup failed" in result.stderr
     assert "HTTP Request" not in result.stderr
+
+
+def _schema_paths(**env: str) -> list[str]:
+    """The /docs paths of an app imported fresh with these env vars (routes are listed once, at import)."""
+    script = "import json, main\nprint(json.dumps(sorted(main.app.openapi()['paths'])))\n"
+    with tempfile.TemporaryDirectory() as empty_dir:
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=empty_dir,
+            env={**os.environ, "PYTHONPATH": str(REPO_ROOT), **env},
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    return json.loads(result.stdout)
+
+
+def test_the_audio_routes_are_listed_in_the_docs_only_where_audio_is_on():
+    off = _schema_paths(AUDIO_ENGINES="[]")
+    on = _schema_paths(AUDIO_ENGINES='["google"]', USE_MOCKS="true")
+
+    assert "/words/search" in off
+    assert not any(path.startswith("/audio") for path in off)
+    assert {"/audio/generate", "/audio/voices"} <= set(on)

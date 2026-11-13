@@ -88,7 +88,7 @@ async def generate(user_id: int, language: Language, text: str, engine: AudioEng
     except SpeechError as exc:
         logger.warning("Audio generation failed: engine=%s language=%s: %s", engine, language, exc)
         raise EngineFailedError("The audio engine failed, try again later") from exc
-    # One line per generation, for comparing engines (audio plan B4).
+    # One line per generation, so engines can be compared on speed from the logs.
     logger.info(
         "Audio generated: engine=%s voice=%s language=%s characters=%d ms=%d mode=manual",
         engine,
