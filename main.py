@@ -1,12 +1,16 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
+from audio.router import router as audio_router
 from auth.dependencies import limit_requests_per_ip
 from auth.router import auth_router
 from core.database import engine
+from core.media_storage import LOCAL_MEDIA_DIR, STORAGE, LocalFolderStorage
 from core.proxy_signature import require_proxy_signature
 from core.redis import redis_client
 from core.sentry import init_sentry
@@ -14,6 +18,13 @@ from games.router import router as games_router
 from games.router import settings_router as game_settings_router
 from settings import settings
 from words.router import router as words_router
+
+# The app's own log lines go to stderr, which Cloud Run keeps as logs. Without
+# this, Python drops everything below WARNING. Warnings only, as for libraries
+# (httpx logs every request at INFO), except the audio module's one INFO line
+# per generation, kept for comparing engines.
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s:     %(name)s: %(message)s")
+logging.getLogger("audio").setLevel(logging.INFO)
 
 # Before the app is created, so Sentry's FastAPI integration sees all of it.
 init_sentry(settings)
@@ -53,6 +64,8 @@ app.include_router(words_router, dependencies=_from_proxy)
 app.include_router(auth_router, dependencies=_from_proxy)
 app.include_router(games_router, dependencies=_from_proxy)
 app.include_router(game_settings_router, dependencies=_from_proxy)
+# Listed in /docs only where audio generation is on: elsewhere every /audio route is a 404.
+app.include_router(audio_router, dependencies=_from_proxy, include_in_schema=bool(settings.audio_engines))
 
 
 @app.get("/health", include_in_schema=False)
@@ -63,6 +76,13 @@ async def health():
     nothing and costs no database or Redis calls.
     """
     return {"status": "ok"}
+
+
+# Local development without a bucket: generated files are written to a local
+# folder (core.media_storage) and served from here. Never in production, which
+# always has MEDIA_BUCKET when audio is on.
+if isinstance(STORAGE, LocalFolderStorage):
+    app.mount("/media", StaticFiles(directory=LOCAL_MEDIA_DIR, check_dir=False), name="media")
 
 
 if settings.cors_origins:

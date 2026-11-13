@@ -13,6 +13,7 @@ __pycache__/
 htmlcov/
 .ruff_cache/
 .mypy_cache/
+local-media/
 
 # Not needed to run the API
 .git/

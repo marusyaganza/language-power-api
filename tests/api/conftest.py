@@ -27,6 +27,8 @@ from sqlalchemy.pool import NullPool
 
 import auth.dependencies
 import auth.service
+import core.media_storage
+import core.pending_media
 import games.session_store
 from auth.rate_limit import AttemptLimiter
 from core.database import AsyncSessionLocal, get_db
@@ -40,6 +42,27 @@ PASSWORD = "correct-horse-battery"
 @pytest.fixture(scope="session")
 def anyio_backend():
     return "asyncio"
+
+
+class InMemoryStorage(core.media_storage.MediaStorage):
+    """Stands in for the bucket: keeps uploads in `files` (path → bytes, content type)."""
+
+    BASE_URL = "https://storage.test/media"
+
+    def __init__(self):
+        self.files: dict[str, tuple[bytes, str]] = {}
+
+    async def upload(self, data: bytes, path: str, content_type: str) -> str:
+        self.files.setdefault(path, (data, content_type))
+        return f"{self.BASE_URL}/{path}"
+
+
+@pytest.fixture(autouse=True)
+def media_storage(monkeypatch) -> InMemoryStorage:
+    """Every API test stores media in memory: never in a bucket or the repo's local-media/."""
+    storage = InMemoryStorage()
+    monkeypatch.setattr(core.media_storage, "STORAGE", storage)
+    return storage
 
 
 @pytest.fixture(scope="session")
@@ -89,6 +112,7 @@ async def redis(monkeypatch):
     client = aioredis.from_url(settings.redis_url, decode_responses=True)
     monkeypatch.setattr(auth.service, "redis_client", client)
     monkeypatch.setattr(games.session_store, "redis_client", client)
+    monkeypatch.setattr(core.pending_media, "redis_client", client)
     try:
         yield client
     finally:

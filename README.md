@@ -16,6 +16,7 @@ Third version of the Language Power application: a vocabulary trainer for Englis
 
 - In active development
 - Deployed privately for my own daily use, with signup closed
+- In beta, on the private deployment only: Korean, and audio generation, which is still experimental. The demo offers English and Spanish
 - Public demo: [language-power.netlify.app](https://language-power.netlify.app/); see [Demo](#demo)
 - Not a public production service
 
@@ -40,6 +41,7 @@ The app shows how many searches are left, and explains the limits when one is re
 - Edit saved words, and browse the vocabulary with search, sorting and pagination
 - Practise saved words in six games: pick the meaning, pick the word, type the word, listen and type, name the picture, and noun gender (Spanish only)
 - Spaced-repetition scheduling per word and per game, with three presets or custom settings
+- Audio generation (beta, private deployment only): generate a saved word's pronunciation with Google Cloud Text-to-Speech, listen to it, try other voices, and keep it by saving the word
 
 The spaced repetition is a simplified scheduler inspired by Anki's learning steps and intervals, not a reproduction of its algorithm. The games, their rules and the scheduling are described in [docs/games.md](docs/games.md).
 
@@ -51,14 +53,15 @@ Each feature module (`auth`, `words`, `games`) is split the same way:
 
 - **Routers** handle HTTP only: they read the request, pass the logged-in user to a service, and map the service's errors to status codes.
 - **Services** hold the rules, raise domain errors that know nothing about HTTP, and own the transaction: each write ends in a single commit.
-- **Repositories** (`repository.py`) build the queries and never commit. Services only call `db.get` for a lookup by primary key. The exception is `users`, whose service is just two one-line lookups.
+- **Repositories** (`repository.py`) build the queries and never commit. Services only call `db.get` for a lookup by primary key. The exception is `users`, whose service is just two one-line lookups. `audio` has a router and a service but no repository: it stores nothing in PostgreSQL.
 
 Some rules hold everywhere:
 
 - Everything is async: SQLAlchemy 2.0 with psycopg 3, and the asyncio Redis client. CPU-bound work (bcrypt) runs in a thread so it does not block the event loop.
 - One database session per request. Relationships are never lazy-loaded: queries load what they need explicitly, and a missing load fails loudly instead of running a hidden query.
 - Data belongs to a user. A word or game session that belongs to someone else is reported exactly like one that does not exist.
-- Dictionary providers sit behind one interface, so the Merriam-Webster API clients, the Korean dictionary imported into PostgreSQL and the mock ones are interchangeable.
+- Dictionary providers sit behind one interface, so the Merriam-Webster API clients, the Korean dictionary imported into PostgreSQL and the mock ones are interchangeable. Text-to-speech engines do the same (`audio/`).
+- Generated audio is never stored before it's wanted. Each generation is held in Redis for 24 hours; saving the word uploads the chosen one, once, to Cloud Storage under the hash of its bytes, so trying voices costs no storage writes and a stored file never changes.
 
 ## Tech stack
 
@@ -68,6 +71,7 @@ Some rules hold everywhere:
 - PostgreSQL 18, with pg_trgm for Korean spelling suggestions
 - Redis 7 for auth sessions and game sessions
 - httpx for the Merriam-Webster API
+- Google Cloud Text-to-Speech and Cloud Storage, for audio generation (beta)
 - bcrypt for password hashing
 - pytest and pytest-cov, ruff
 - Docker, GitHub Actions and Google Cloud Run
@@ -78,11 +82,12 @@ Some rules hold everywhere:
 | --- | --- |
 | `main.py` | Creates the FastAPI app and includes the routers |
 | `settings.py` | All configuration, read from environment variables and `.env` |
-| `core/` | Database engine and session factory, Redis client, and the `Language` enum shared by every module |
+| `core/` | Database engine and session factory, Redis client, the `Language` and `AudioEngine` enums shared by every module, and media storage: Cloud Storage uploads and files held in Redis until saved |
 | `auth/` | Signup, login, logout, server-side sessions and the `get_current_user` dependency |
 | `users/` | User model, password hashing and user lookups |
 | `words/` | Dictionary search and the saved vocabulary |
 | `games/` | Game sessions, answer grading, spaced repetition and per-user settings |
+| `audio/` | Audio generation (beta): one synthesizer per engine (Google Cloud Text-to-Speech) and a mock, the voices, and the `/audio` routes |
 | `dictionary/` | One provider per language (`en/`, `es/`, `ko/`), the shared Merriam-Webster code (`merriam_webster/`), and the mock providers. `ko/` also holds the Korean tables and their import script ([ko/README.md](dictionary/ko/README.md)). [dictionary/README.md](dictionary/README.md) lists the steps for adding a language |
 | `dictionary/fixtures/` | Made-up entries in each source's format, with sample audio and pictures, for tests and local development ([fixtures/README.md](dictionary/fixtures/README.md)) |
 | `alembic/` | Database migrations |
@@ -141,6 +146,8 @@ Some rules hold everywhere:
 
    The API runs on `http://localhost:8000`, with interactive documentation at `http://localhost:8000/docs`. Sign up through `POST /auth/signup` or the frontend, then search for one of the mocked words, `cat`, `wheel`, `brave`, `journey` or `although` in English, `gato`, `ballena`, `idioma`, `ecologista` or `vivir` in Spanish, `가게`, `가다`, `조용하다`, `아마` or `눈이 높다` in Korean. A search for any other word returns the list of mocked ones. `cat` and `gato` have audio and a picture, loaded straight from Wikimedia Commons and Lorem Picsum, so they need an internet connection.
 
+   To try audio generation (beta), add `AUDIO_ENGINES=["google"]` to `.env`. In mock mode no Google account is needed: the edit form's "Generate audio" returns a short tone, and saved files go to a local `local-media/` folder that the API serves.
+
 ### Database migrations
 
 After changing a model, generate a migration, read it before applying it (autogenerate misses some changes, such as data updates), then apply it. [alembic/README.md](alembic/README.md) describes the setup and the conventions.
@@ -172,7 +179,7 @@ pytest --cov           # with a coverage report (configured in .coveragerc)
 - **Unit tests** cover the pure logic: scoring, spaced repetition, hints, multiple-choice options, word selection, schemas, the Merriam-Webster parsing, and reading and formatting the Korean dictionary.
 - The Korean import and searches are tested against PostgreSQL with made-up XML and rows, among the API tests.
 - **API tests** call the app over HTTP and need PostgreSQL and Redis from `docker compose up -d`. They create a separate `language_app_test` database and run every migration on it, so the migrations are tested too. Each test runs in a transaction that is rolled back afterwards, and Redis database 15 is flushed after each test, so the development data is never touched.
-- Tests always use the mock dictionaries, whatever `.env` says, and need no API keys.
+- Tests always use the mock dictionaries and the mock text-to-speech, whatever `.env` says, and need no API keys or Google account. The run stops at once if the real ones are configured. API tests store generated audio in memory, never in a bucket.
 
 Linting and formatting use [ruff](https://docs.astral.sh/ruff/), configured in `pyproject.toml`:
 
@@ -197,6 +204,7 @@ CI runs ruff and then the whole suite against PostgreSQL and Redis containers on
   | `/words` | Dictionary search and the user's saved vocabulary |
   | `/games` | Listing games, and starting, answering and finishing game sessions |
   | `/users/me/game-settings` | Spaced-repetition settings and presets |
+| `/audio` | Generating a word's audio and listing voices (beta; answers 404 unless `AUDIO_ENGINES` is set) |
 
 - **Errors:** services raise domain errors, and each router maps them to a status code, for example 404 for a word that does not exist, 409 for a word already saved, and 503 when the dictionary is unavailable. Request validation errors are 422.
 
@@ -213,6 +221,7 @@ The browser only ever talks to the Netlify origin, so the session cookie stays f
 - `.github/workflows/demo-cleanup.yml` runs daily and deletes demo accounts older than `ACCOUNT_TTL_HOURS` with all their data, for days when no signup does it.
 - `.github/workflows/deploy.yml` is started by hand. It runs the tests, builds and pushes the image, deploys it to Cloud Run, and checks that the new revision answers. GitHub authenticates to Google Cloud through Workload Identity Federation, so no service account key is stored anywhere.
 - The same image runs as two deployments, each in its own Google Cloud project with its own database, Redis and secrets: a private one (signup closed) and the public demo (open signup, `/docs` on, errors reported to Sentry). The workflow's `target` input picks one, and `deploy/<target>.env.yaml` holds its settings.
+- Audio generation runs on the private deployment only, with its own public-read bucket; the API's service account may only create files there. Generating can cost money and saving uses storage writes, so the app refuses to start with audio generation on, real APIs and open signup: the demo can't get it by accident.
 
 ## Related projects
 
@@ -226,11 +235,14 @@ Definitions, examples, pronunciation audio and illustrations come from the [Merr
 
 Korean entries are adapted from the [Korean Learners' Dictionary (한국어기초사전)](https://krdict.korean.go.kr) of the National Institute of Korean Language, licensed under [CC BY-SA 2.0 KR](https://creativecommons.org/licenses/by-sa/2.0/kr/): its text is imported into each deployment's database, reformatted, with English parts of speech and selected fields, and credited in the app. Its pictures and recordings aren't openly licensed and aren't used. None of it is stored in this repository; the Korean fixtures are made up. This project is not affiliated with or endorsed by the National Institute of Korean Language.
 
+Generated audio is made by Google Cloud Text-to-Speech on the private deployment and stored in its own bucket, not in this repository. The mock's tone (`audio/mock.mp3`) was made for this project.
+
 ## Limitations
 
 - The personal deployment is private and signup is closed. The demo has open signup but strict limits (see [Demo](#demo)).
 - Real dictionary lookups need your own Merriam-Webster API keys; mock mode only knows four made-up words per language.
 - Korean is in beta, on the private deployment only. A conjugated form the dictionary doesn't list (먹었어요 for 먹다) isn't found yet, and Korean entries have no audio or pictures of their own.
+- Audio generation is in beta, still experimental, and on the private deployment only. It runs by hand on the edit form, with Google Cloud Text-to-Speech as its one engine; when a word's generated audio is replaced, the old file stays in the bucket.
 - Rate limits are counted in memory, which is exact only because each deployment runs a single instance.
 - The data model may still change.
 

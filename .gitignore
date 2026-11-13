@@ -219,3 +219,6 @@ __marimo__/
 
 # private notes
 notes
+
+# Generated media in local development (core.media_storage.LocalFolderStorage)
+local-media/

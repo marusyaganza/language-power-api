@@ -38,6 +38,10 @@ _STATUS_FOR_ERROR: dict[type[service.WordsError], int] = {
     service.SearchLimitReachedError: status.HTTP_429_TOO_MANY_REQUESTS,
     service.DailySearchLimitReachedError: status.HTTP_429_TOO_MANY_REQUESTS,
     service.WordLimitReachedError: status.HTTP_409_CONFLICT,
+    service.AudioGenerationOffError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    service.GeneratedAudioExpiredError: status.HTTP_409_CONFLICT,
+    service.GeneratedAudioMismatchError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    service.MediaStorageUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 
@@ -142,7 +146,12 @@ async def edit_word(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Edit a saved word. Fields left out of the body are unchanged. 404 if not found."""
+    """Edit a saved word. Fields left out of the body are unchanged. 404 if not found.
+
+    With `audio_token` (from POST /audio/generate), that audio becomes the
+    word's own: 409 if it expired (generate it again), 422 if it was made for
+    another word, 503 if it couldn't be stored (save again).
+    """
     with _http_errors():
         return await service.update_word(db, current_user.id, word_id, payload)
 

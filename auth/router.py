@@ -108,7 +108,8 @@ async def auth_config(db: AsyncSession = Depends(get_db)):
     are all taken. `account_ttl_hours` and `searches_per_language` are the
     demo's limits, for the notice that explains them; null where they're off.
     `languages` are the languages this deployment offers: the frontend shows
-    only these.
+    only these. `audio_engines` are the engines that can generate a word's
+    audio; empty where audio generation is off.
     """
     return {
         "signup_enabled": service.signups_open(),
@@ -117,6 +118,7 @@ async def auth_config(db: AsyncSession = Depends(get_db)):
         "account_ttl_hours": settings.account_ttl_hours,
         "searches_per_language": settings.searches_per_language,
         "languages": settings.enabled_languages,
+        "audio_engines": settings.audio_engines,
     }
 
 

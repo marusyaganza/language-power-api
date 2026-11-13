@@ -133,7 +133,10 @@ def api_routes(routes):
             yield from api_routes(route.original_router.routes)
 
 
-async def test_every_route_but_the_public_ones_needs_a_session(make_client):
+async def test_every_route_but_the_public_ones_needs_a_session(make_client, monkeypatch):
+    # Features that are off answer 404 before anything else: turn them on, so
+    # their routes are checked too.
+    monkeypatch.setattr(settings, "audio_engines", ["google"])
     routes = set(api_routes(app.routes))
     # Also proves the walk above found the routers' routes.
     assert PUBLIC_ROUTES <= routes

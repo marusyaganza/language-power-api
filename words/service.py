@@ -28,8 +28,10 @@ from psycopg.errors import UniqueViolation
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from audio import service as audio_service
 from core import utc_day
 from core.language import Language
+from core.media_storage import StorageError
 from dictionary.base import DictionaryError
 from dictionary.providers import PROVIDERS
 from settings import settings
@@ -123,6 +125,22 @@ class DailySearchLimitReachedError(WordsError):
 
 class WordLimitReachedError(WordsError):
     """The user has saved as many words as an account may have."""
+
+
+class AudioGenerationOffError(WordsError):
+    """An `audio_token` was sent where audio generation is off."""
+
+
+class GeneratedAudioExpiredError(WordsError):
+    """The `audio_token` is unknown: it expired, or was never the user's."""
+
+
+class GeneratedAudioMismatchError(WordsError):
+    """The `audio_token`'s audio was generated for another word (other text or language)."""
+
+
+class MediaStorageUnavailableError(WordsError):
+    """The audio couldn't be stored right now; saving again may work."""
 
 
 # --------------------------------------------------------------------------- #
@@ -298,15 +316,32 @@ async def update_word(db: AsyncSession, user_id: int, word_id: int, payload: Wor
     Changing `img_url` without sending `img_desc` clears the old description,
     which described the previous image.
 
+    `audio_token` (from POST /audio/generate) makes that audio the word's own:
+    it's uploaded to the media storage, and its URL becomes `audio_url`. The
+    upload happens before the commit, so a failed save leaves at most an
+    unused file; the token is let go only once the word is saved, so a failed
+    save can be sent again.
+
     Raises:
         WordNotFoundError: the user has no saved word with this id.
+        AudioGenerationOffError: `audio_token` sent where audio generation is off.
+        GeneratedAudioExpiredError: the token is unknown (expired, or not the user's).
+        GeneratedAudioMismatchError: the token's audio is for another word.
+        MediaStorageUnavailableError: the audio couldn't be uploaded.
     """
     word = await _get_owned_word(db, user_id, word_id)
     sent = payload.model_fields_set
+    # First, before the word is touched: a token that can't be used fails the
+    # whole edit, with nothing changed.
+    generated_audio_url = None
+    if payload.audio_token is not None:
+        generated_audio_url = await _store_generated_audio(user_id, word, payload.audio_token)
 
     if payload.defs is not None:
         word.defs = payload.defs
-    if "audio_url" in sent:
+    if generated_audio_url is not None:
+        word.audio_url = generated_audio_url
+    elif "audio_url" in sent:
         word.audio_url = payload.audio_url
     if "img_url" in sent and payload.img_url != word.img_url:
         word.img_url = payload.img_url
@@ -320,7 +355,25 @@ async def update_word(db: AsyncSession, user_id: int, word_id: int, payload: Wor
         word.examples = _to_examples(payload.examples)
 
     await db.commit()
+    if payload.audio_token is not None:
+        await audio_service.discard_generation(user_id, payload.audio_token)
     return word
+
+
+async def _store_generated_audio(user_id: int, word: Word, token: str) -> str:
+    """Upload the user's generation held under `token` for `word`; return its URL."""
+    if not settings.audio_engines:
+        raise AudioGenerationOffError("Audio generation isn't available")
+    held = await audio_service.held_generation(user_id, token)
+    if held is None:
+        raise GeneratedAudioExpiredError("The generated audio expired, generate it again")
+    if held.meta["language"] != word.language or held.meta["text"] != word.name.strip():
+        raise GeneratedAudioMismatchError("This audio was generated for another word")
+    try:
+        return await audio_service.store_generation(held)
+    except StorageError as exc:
+        logger.warning("Storing generated audio failed for word_id=%s: %s", word.id, exc)
+        raise MediaStorageUnavailableError("The audio couldn't be stored, try saving again") from exc
 
 
 async def delete_word(db: AsyncSession, user_id: int, word_id: int) -> None:
