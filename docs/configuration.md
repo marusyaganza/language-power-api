@@ -27,7 +27,10 @@ Settings are read from the environment, then from `.env`. Names are case-insensi
 | `ACCOUNT_TTL_HOURS` | none | Accounts older than this are logged out and deleted at the next signup |
 | `MAX_WORDS_PER_USER` | none | Saved words per account |
 | `AUDIO_ENGINES` | `[]` | Beta. JSON list of the engines that can generate a word's audio, e.g. `["google"]`; `GET /auth/config` lists them. `[]` or no value: off, and the `/audio` routes answer 404. Private deployments only: with real APIs (`USE_MOCKS=false`) the app refuses to start if `SIGNUP_ENABLED` is also `true`. Google credentials come from the environment (on Cloud Run, the service account); with mocks, a short tone stands in |
-| `MEDIA_BUCKET` | none | Public-read Cloud Storage bucket for generated audio; required when `AUDIO_ENGINES` is on and `USE_MOCKS` is `false`. Unset with mocks on: files go to `local-media/`, served by the API under `/media` |
+| `IMAGE_SEARCH_PROVIDERS` | `[]` | Beta. JSON list of the image search APIs a word's image can be picked from, e.g. `["pixabay"]`; `GET /auth/config` says whether image search is on (`image_search`). `[]` or no value: off. Private deployments only, with the same startup check as `AUDIO_ENGINES` |
+| `PIXABAY_API_KEY` | none | Pixabay API key; required when `IMAGE_SEARCH_PROVIDERS` has `pixabay` and `USE_MOCKS` is `false` |
+| `IMAGE_SAFE_SEARCH` | `true` | Ask image search APIs for images suitable for all ages only |
+| `MEDIA_BUCKET` | none | Public-read Cloud Storage bucket for generated audio and picked images; required when `AUDIO_ENGINES` or `IMAGE_SEARCH_PROVIDERS` is on and `USE_MOCKS` is `false`. Unset with mocks on: files go to `local-media/`, served by the API under `/media` |
 | `SENTRY_DSN` | none | Report errors to Sentry; unset sends nothing |
 | `SENTRY_ENVIRONMENT` | `local` | Environment name on Sentry events |
 | `SENTRY_RELEASE` | none | The release on Sentry events; the Docker image sets it to the commit it was built from |

@@ -5,6 +5,7 @@ from pydantic import Field, PositiveInt, SecretStr, field_validator, model_valid
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from core.audio_engine import AudioEngine
+from core.image_source import ImageSource
 from core.language import Language
 
 
@@ -85,7 +86,14 @@ class Settings(BaseSettings):
     # frontend which to show. `AUDIO_ENGINES=` with no value also means off
     # (NoDecode: read as text, then parsed below, so it isn't invalid JSON).
     audio_engines: Annotated[list[AudioEngine], NoDecode] = []
-    # The Cloud Storage bucket generated audio is uploaded to (public read).
+    # Image search for a word's image, for private deployments only too.
+    # The sources offered, as JSON: IMAGE_SEARCH_PROVIDERS='["pixabay"]'.
+    # Empty (the default) turns the feature off, the same way as audio.
+    image_search_providers: Annotated[list[ImageSource], NoDecode] = []
+    pixabay_api_key: SecretStr | None = None
+    # Only images suitable for all ages. The personal deployment turns it off.
+    image_safe_search: bool = True
+    # The Cloud Storage bucket generated audio and picked images are uploaded to (public read).
     media_bucket: str | None = None
 
     # Error reporting (core.sentry). No DSN: nothing is sent.
@@ -103,30 +111,38 @@ class Settings(BaseSettings):
             raise ValueError(f"{', '.join(missing)} must be set when USE_MOCKS is off")
         return self
 
-    @field_validator("audio_engines", mode="before")
+    @field_validator("audio_engines", "image_search_providers", mode="before")
     @classmethod
-    def audio_engines_from_text(cls, value):
+    def media_list_from_text(cls, value):
         """The environment's text: JSON, or nothing at all for "off"."""
         if isinstance(value, str):
             return json.loads(value) if value.strip() else []
         return value
 
-    @model_validator(mode="after")
-    def audio_only_on_private_deployments(self) -> Self:
-        """Refuse to start with audio generation on a public deployment.
+    def media_features_on(self) -> list[str]:
+        """The settings of the media features that are turned on, by name."""
+        features = {"AUDIO_ENGINES": self.audio_engines, "IMAGE_SEARCH_PROVIDERS": self.image_search_providers}
+        return [name for name, value in features.items() if value]
 
-        Every generation costs money and bucket writes, and nothing limits
-        strangers' use of it. Open signup with real APIs is the public demo;
-        with mocks (tests, local development) nothing is paid for.
+    @model_validator(mode="after")
+    def media_only_on_private_deployments(self) -> Self:
+        """Refuse to start with audio generation or image search on a public deployment.
+
+        Every saved file uses one of the bucket's free writes, generations cost
+        money, and nothing limits strangers' use of them. Open signup with real
+        APIs is the public demo; with mocks (tests, local development) nothing
+        is paid for.
         """
-        if not self.audio_engines or self.use_mocks:
+        features = self.media_features_on()
+        if not features or self.use_mocks:
             return self
+        names = " and ".join(features)
         if self.signup_enabled:
-            raise ValueError(
-                "Audio generation is for private deployments only: turn off AUDIO_ENGINES or SIGNUP_ENABLED"
-            )
+            raise ValueError(f"Media features are for private deployments only: turn off {names} or SIGNUP_ENABLED")
         if not self.media_bucket:
-            raise ValueError("MEDIA_BUCKET must be set when AUDIO_ENGINES is on and USE_MOCKS is off")
+            raise ValueError(f"MEDIA_BUCKET must be set when {names} is on and USE_MOCKS is off")
+        if ImageSource.PIXABAY in self.image_search_providers and self.pixabay_api_key is None:
+            raise ValueError("PIXABAY_API_KEY must be set when IMAGE_SEARCH_PROVIDERS has pixabay and USE_MOCKS is off")
         return self
 
 
