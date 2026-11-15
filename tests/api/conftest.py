@@ -30,6 +30,7 @@ import auth.service
 import core.media_storage
 import core.pending_media
 import games.session_store
+import images.search_cache
 from auth.rate_limit import AttemptLimiter
 from core.database import AsyncSessionLocal, get_db
 from main import app
@@ -113,6 +114,7 @@ async def redis(monkeypatch):
     monkeypatch.setattr(auth.service, "redis_client", client)
     monkeypatch.setattr(games.session_store, "redis_client", client)
     monkeypatch.setattr(core.pending_media, "redis_client", client)
+    monkeypatch.setattr(images.search_cache, "redis_client", client)
     try:
         yield client
     finally:
