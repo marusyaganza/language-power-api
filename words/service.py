@@ -490,6 +490,15 @@ async def get_words_by_ids(db: AsyncSession, user_id: int, word_ids: list[int]) 
 # --------------------------------------------------------------------------- #
 
 
+async def get_word(db: AsyncSession, user_id: int, word_id: int) -> Word:
+    """One of the user's saved words, with its examples, for other modules (e.g. images).
+
+    Raises:
+        WordNotFoundError: no such word, or it belongs to another user.
+    """
+    return await _get_owned_word(db, user_id, word_id)
+
+
 async def _get_owned_word(db: AsyncSession, user_id: int, word_id: int) -> Word:
     """Load a saved word together with its examples.
 

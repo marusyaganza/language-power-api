@@ -137,6 +137,7 @@ async def test_every_route_but_the_public_ones_needs_a_session(make_client, monk
     # Features that are off answer 404 before anything else: turn them on, so
     # their routes are checked too.
     monkeypatch.setattr(settings, "audio_engines", ["google"])
+    monkeypatch.setattr(settings, "image_search_providers", ["pixabay"])
     routes = set(api_routes(app.routes))
     # Also proves the walk above found the routers' routes.
     assert PUBLIC_ROUTES <= routes
