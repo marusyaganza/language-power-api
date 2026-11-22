@@ -221,7 +221,9 @@ async def test_saving_with_a_pick_stores_a_webp_and_sets_the_url(client, images_
     [(path, (data, content_type))] = media_storage.files.items()
     assert path == f"images/pixabay/{hashlib.sha256(data).hexdigest()}.webp"
     assert content_type == "image/webp"
-    assert Image.open(io.BytesIO(data)).format == "WEBP"
+    stored = Image.open(io.BytesIO(data))
+    # The 640×427 download, shrunk to fit 512 px (427 × 0.8 = 341.6, rounded).
+    assert (stored.format, stored.size) == ("WEBP", (512, 342))
     assert response.json()["img_url"] == f"{InMemoryStorage.BASE_URL}/{path}"
     assert (await vocabulary_word(client))["img_url"] == response.json()["img_url"]
 
