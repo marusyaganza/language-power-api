@@ -114,6 +114,14 @@ async def test_new_image_clears_the_old_description(client):
     assert described["img_desc"] == "the newer image"
 
 
+async def test_sending_the_same_image_again_keeps_its_description(client):
+    word = await save_word(client, "casa", img_url="https://i/old.png", img_desc="the old image")
+
+    edited = (await client.patch(f"/words/{word['id']}", json={"img_url": "https://i/old.png"})).json()
+
+    assert edited["img_desc"] == "the old image"
+
+
 async def test_edit_cannot_remove_every_definition(client):
     word = await save_word(client, "casa")
     response = await client.patch(f"/words/{word['id']}", json={"defs": [" "]})

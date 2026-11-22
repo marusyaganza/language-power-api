@@ -42,6 +42,9 @@ _STATUS_FOR_ERROR: dict[type[service.WordsError], int] = {
     service.GeneratedAudioExpiredError: status.HTTP_409_CONFLICT,
     service.GeneratedAudioMismatchError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     service.MediaStorageUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
+    service.ImageSearchOffError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    service.PickedImageGoneError: status.HTTP_409_CONFLICT,
+    service.PickedImageUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 
@@ -151,6 +154,11 @@ async def edit_word(
     With `audio_token` (from POST /audio/generate), that audio becomes the
     word's own: 409 if it expired (generate it again), 422 if it was made for
     another word, 503 if it couldn't be stored (save again).
+
+    With `img_pick` (an image from GET /images/search), the server downloads
+    that image and stores a 512 px copy as the word's own: 409 if the source
+    no longer has it (pick another), 422 where image search is off, 503 if it
+    couldn't be fetched or stored (save again).
     """
     with _http_errors():
         return await service.update_word(db, current_user.id, word_id, payload)
