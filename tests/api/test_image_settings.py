@@ -11,7 +11,9 @@ from settings import Settings, settings
 
 pytestmark = pytest.mark.anyio
 
-DEPLOY = Path(__file__).resolve().parents[2] / "deploy"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEPLOY = REPO_ROOT / "deploy"
+WORKFLOW = REPO_ROOT / ".github" / "workflows" / "deploy.yml"
 SETTINGS_ENV = (
     "AUDIO_ENGINES",
     "IMAGE_SEARCH_PROVIDERS",
@@ -79,6 +81,32 @@ def test_the_personal_deployment_can_turn_image_search_on(monkeypatch):
     assert (built.image_search_providers, built.image_safe_search) == (["pixabay"], False)
 
 
+def test_the_personal_deployment_starts_with_image_search_on_as_it_is(monkeypatch):
+    """With the key from Secret Manager, as Cloud Run passes it."""
+    env = deploy_env("personal.env.yaml") | {"PIXABAY_API_KEY": "from-secret-manager"}
+
+    built = settings_from(env, monkeypatch)
+
+    assert (built.image_search_providers, built.image_safe_search) == (["pixabay"], False)
+
+
+def test_the_personal_deployment_wont_start_without_its_pixabay_secret(monkeypatch):
+    with pytest.raises(ValidationError, match="PIXABAY_API_KEY"):
+        settings_from(deploy_env("personal.env.yaml"), monkeypatch)
+
+
+def test_the_deploy_workflow_passes_the_pixabay_secret_to_personal_only():
+    """--set-secrets replaces every secret on each deploy: one left out would stop personal from starting."""
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert 'personal) SECRETS="$SECRETS PIXABAY_API_KEY" ;;' in workflow
+    assert workflow.count("PIXABAY_API_KEY") == 1
+
+
+def test_the_demo_still_starts_with_image_search_off(monkeypatch):
+    assert settings_from(deploy_env("demo.env.yaml"), monkeypatch).image_search_providers == []
+
+
 def test_real_image_search_needs_a_bucket(monkeypatch):
     env = {"USE_MOCKS": "false", "SIGNUP_ENABLED": "false"} | PIXABAY_ON
     del env["MEDIA_BUCKET"]
@@ -87,16 +115,24 @@ def test_real_image_search_needs_a_bucket(monkeypatch):
         settings_from(env, monkeypatch)
 
 
-def test_real_pixabay_search_needs_its_key(monkeypatch):
+@pytest.mark.parametrize("key", [None, "", "  "], ids=["unset", "empty", "blank"])
+def test_real_pixabay_search_needs_its_key(monkeypatch, key):
     env = {"USE_MOCKS": "false", "SIGNUP_ENABLED": "false"} | PIXABAY_ON
     del env["PIXABAY_API_KEY"]
+    if key is not None:
+        env["PIXABAY_API_KEY"] = key
 
     with pytest.raises(ValidationError, match="PIXABAY_API_KEY"):
         settings_from(env, monkeypatch)
 
 
 def test_audio_alone_needs_no_pixabay_key(monkeypatch):
-    env = deploy_env("personal.env.yaml") | {"AUDIO_ENGINES": '["google"]', "MEDIA_BUCKET": "some-bucket"}
+    env = {
+        "USE_MOCKS": "false",
+        "SIGNUP_ENABLED": "false",
+        "AUDIO_ENGINES": '["google"]',
+        "MEDIA_BUCKET": "some-bucket",
+    }
 
     assert settings_from(env, monkeypatch).pixabay_api_key is None
 

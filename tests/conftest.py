@@ -33,6 +33,11 @@ os.environ.update(
         # tests that need them set them.
         "AUDIO_ENGINES": "[]",
         "MEDIA_BUCKET": "",
+        # Image search off, safe search at its default and never a real Pixabay
+        # key, even if `.env` sets them; tests that need them set them.
+        "IMAGE_SEARCH_PROVIDERS": "[]",
+        "IMAGE_SAFE_SEARCH": "true",
+        "PIXABAY_API_KEY": "",
     }
 )
 

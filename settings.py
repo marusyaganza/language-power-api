@@ -141,7 +141,8 @@ class Settings(BaseSettings):
             raise ValueError(f"Media features are for private deployments only: turn off {names} or SIGNUP_ENABLED")
         if not self.media_bucket:
             raise ValueError(f"MEDIA_BUCKET must be set when {names} is on and USE_MOCKS is off")
-        if ImageSource.PIXABAY in self.image_search_providers and self.pixabay_api_key is None:
+        pixabay_key = self.pixabay_api_key.get_secret_value() if self.pixabay_api_key else ""
+        if ImageSource.PIXABAY in self.image_search_providers and not pixabay_key.strip():
             raise ValueError("PIXABAY_API_KEY must be set when IMAGE_SEARCH_PROVIDERS has pixabay and USE_MOCKS is off")
         return self
 
