@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, BeforeValidator, Field, field_validator, model_validator
 
 from core.enabled_language import EnabledLanguage
+from core.image_source import ImageSource
 from core.language import Language
 from dictionary.entry import unique_definitions
 
@@ -26,6 +27,7 @@ MAX_TRANSCRIPTION_LENGTH = 100
 MAX_IMG_DESC_LENGTH = 1000
 MAX_URL_LENGTH = 2048
 MAX_AUDIO_TOKEN_LENGTH = 64  # core.pending_media's tokens are 43 characters
+MAX_IMAGE_ID_LENGTH = 64  # Pixabay's ids are numbers of up to 8 digits
 # The search text of /words/search and /words/vocabulary.
 MAX_QUERY_LENGTH = 100
 
@@ -128,6 +130,13 @@ class VocabularyPage(BaseModel):
     total_pages: int
 
 
+class ImagePick(BaseModel):
+    """An image picked from GET /images/search: where it was found, and its id there."""
+
+    source: ImageSource
+    id: str = Field(max_length=MAX_IMAGE_ID_LENGTH, pattern=r"^[A-Za-z0-9_-]+$")
+
+
 class WordUpdate(BaseModel):
     defs: list[Definition] | None = Field(default=None, min_length=1, max_length=MAX_DEFINITIONS)
     examples: list[ExampleIn] | None = Field(default=None, max_length=MAX_EXAMPLES)
@@ -137,6 +146,9 @@ class WordUpdate(BaseModel):
     # The `token` from POST /audio/generate: saves that audio as the word's own
     # (`audio_url` is then set by the server, so it can't be sent too).
     audio_token: str | None = Field(default=None, max_length=MAX_AUDIO_TOKEN_LENGTH, pattern=r"^[A-Za-z0-9_-]+$")
+    # An image from GET /images/search: saves it as the word's own (downloaded
+    # and stored by the server, which then sets `img_url`, so it can't be sent too).
+    img_pick: ImagePick | None = None
 
     @field_validator("defs")
     @classmethod
@@ -152,6 +164,12 @@ class WordUpdate(BaseModel):
     def audio_token_or_audio_url(self):
         if self.audio_token is not None and "audio_url" in self.model_fields_set:
             raise ValueError("Send either audio_token or audio_url, not both")
+        return self
+
+    @model_validator(mode="after")
+    def img_pick_or_img_url(self):
+        if self.img_pick is not None and "img_url" in self.model_fields_set:
+            raise ValueError("Send either img_pick or img_url, not both")
         return self
 
 

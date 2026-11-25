@@ -109,7 +109,8 @@ async def auth_config(db: AsyncSession = Depends(get_db)):
     demo's limits, for the notice that explains them; null where they're off.
     `languages` are the languages this deployment offers: the frontend shows
     only these. `audio_engines` are the engines that can generate a word's
-    audio; empty where audio generation is off.
+    audio; empty where audio generation is off. `image_search` is whether a
+    word's image can be searched for.
     """
     return {
         "signup_enabled": service.signups_open(),
@@ -119,6 +120,7 @@ async def auth_config(db: AsyncSession = Depends(get_db)):
         "searches_per_language": settings.searches_per_language,
         "languages": settings.enabled_languages,
         "audio_engines": settings.audio_engines,
+        "image_search": bool(settings.image_search_providers),
     }
 
 

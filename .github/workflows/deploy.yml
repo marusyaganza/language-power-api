@@ -96,6 +96,7 @@ jobs:
           SECRETS="DATABASE_URL REDIS_URL ENGLISH_API_KEY SPANISH_API_KEY PROXY_SIGNATURE_SECRET"
           case "$TARGET" in
             demo) SECRETS="$SECRETS SENTRY_DSN" ;;  # only the demo reports to Sentry
+            personal) SECRETS="$SECRETS PIXABAY_API_KEY" ;;  # image search is private-only
           esac
           SET_SECRETS=""
           for name in $SECRETS; do

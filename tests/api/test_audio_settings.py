@@ -22,7 +22,14 @@ DEPLOY = REPO_ROOT / "deploy"
 
 def settings_from(env: dict[str, str], monkeypatch) -> Settings:
     """Settings built from these env vars only (no `.env` file), as Cloud Run would."""
-    for name in ("AUDIO_ENGINES", "MEDIA_BUCKET", "SIGNUP_ENABLED", "USE_MOCKS"):
+    for name in (
+        "AUDIO_ENGINES",
+        "IMAGE_SEARCH_PROVIDERS",
+        "PIXABAY_API_KEY",
+        "MEDIA_BUCKET",
+        "SIGNUP_ENABLED",
+        "USE_MOCKS",
+    ):
         monkeypatch.delenv(name, raising=False)
     for name, value in env.items():
         monkeypatch.setenv(name, value)
@@ -59,13 +66,18 @@ def test_the_demo_starts_as_it_is(monkeypatch):
 
 
 def test_the_personal_deployment_can_turn_audio_on(monkeypatch):
-    env = deploy_env("personal.env.yaml") | {"AUDIO_ENGINES": '["google"]', "MEDIA_BUCKET": "some-bucket"}
+    env = deploy_env("personal.env.yaml") | {
+        "AUDIO_ENGINES": '["google"]',
+        "MEDIA_BUCKET": "some-bucket",
+        "PIXABAY_API_KEY": "from-secret-manager",  # its image search needs it
+    }
 
     assert settings_from(env, monkeypatch).audio_engines == ["google"]
 
 
 def test_the_personal_deployment_starts_with_audio_on_as_it_is(monkeypatch):
-    settings = settings_from(deploy_env("personal.env.yaml"), monkeypatch)
+    # Its secrets come from Secret Manager, not the file; image search needs this one.
+    settings = settings_from(deploy_env("personal.env.yaml") | {"PIXABAY_API_KEY": "from-secret-manager"}, monkeypatch)
 
     assert (settings.audio_engines, settings.media_bucket) == (["google"], "py-lp-512416-media")
 

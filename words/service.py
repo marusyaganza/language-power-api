@@ -34,6 +34,7 @@ from core.language import Language
 from core.media_storage import StorageError
 from dictionary.base import DictionaryError
 from dictionary.providers import PROVIDERS
+from images import picks as image_picks
 from settings import settings
 from words import repository
 from words.models import Example, Word
@@ -140,7 +141,19 @@ class GeneratedAudioMismatchError(WordsError):
 
 
 class MediaStorageUnavailableError(WordsError):
-    """The audio couldn't be stored right now; saving again may work."""
+    """The audio or image couldn't be stored right now; saving again may work."""
+
+
+class ImageSearchOffError(WordsError):
+    """An `img_pick` was sent where image search (or its source) is off."""
+
+
+class PickedImageGoneError(WordsError):
+    """The picked image isn't at its source anymore."""
+
+
+class PickedImageUnavailableError(WordsError):
+    """The picked image couldn't be fetched right now; saving again may work."""
 
 
 # --------------------------------------------------------------------------- #
@@ -322,20 +335,30 @@ async def update_word(db: AsyncSession, user_id: int, word_id: int, payload: Wor
     unused file; the token is let go only once the word is saved, so a failed
     save can be sent again.
 
+    `img_pick` (an image from GET /images/search) works the same way: the
+    image is looked up again at its source, downloaded, converted and stored,
+    and its URL becomes `img_url`, also before the commit.
+
     Raises:
         WordNotFoundError: the user has no saved word with this id.
         AudioGenerationOffError: `audio_token` sent where audio generation is off.
         GeneratedAudioExpiredError: the token is unknown (expired, or not the user's).
         GeneratedAudioMismatchError: the token's audio is for another word.
-        MediaStorageUnavailableError: the audio couldn't be uploaded.
+        ImageSearchOffError: `img_pick` sent where its source isn't offered.
+        PickedImageGoneError: the picked image is gone from its source.
+        PickedImageUnavailableError: the picked image couldn't be fetched.
+        MediaStorageUnavailableError: the audio or image couldn't be uploaded.
     """
     word = await _get_owned_word(db, user_id, word_id)
     sent = payload.model_fields_set
-    # First, before the word is touched: a token that can't be used fails the
-    # whole edit, with nothing changed.
+    # First, before the word is touched: an audio token or image pick that
+    # can't be used fails the whole edit, with nothing changed.
     generated_audio_url = None
     if payload.audio_token is not None:
         generated_audio_url = await _store_generated_audio(user_id, word, payload.audio_token)
+    picked_img_url = None
+    if payload.img_pick is not None:
+        picked_img_url = await _store_picked_image(word, payload.img_pick.source, payload.img_pick.id)
 
     if payload.defs is not None:
         word.defs = payload.defs
@@ -343,10 +366,10 @@ async def update_word(db: AsyncSession, user_id: int, word_id: int, payload: Wor
         word.audio_url = generated_audio_url
     elif "audio_url" in sent:
         word.audio_url = payload.audio_url
-    if "img_url" in sent and payload.img_url != word.img_url:
-        word.img_url = payload.img_url
-        if "img_desc" not in sent:
-            word.img_desc = None
+    if picked_img_url is not None:
+        _set_img_url(word, picked_img_url, img_desc_sent="img_desc" in sent)
+    elif "img_url" in sent:
+        _set_img_url(word, payload.img_url, img_desc_sent="img_desc" in sent)
     if "img_desc" in sent:
         word.img_desc = payload.img_desc
     if payload.examples is not None:
@@ -374,6 +397,29 @@ async def _store_generated_audio(user_id: int, word: Word, token: str) -> str:
     except StorageError as exc:
         logger.warning("Storing generated audio failed for word_id=%s: %s", word.id, exc)
         raise MediaStorageUnavailableError("The audio couldn't be stored, try saving again") from exc
+
+
+def _set_img_url(word: Word, img_url: str | None, *, img_desc_sent: bool) -> None:
+    """A new image clears the old description, unless a new one is sent with it."""
+    if img_url != word.img_url:
+        word.img_url = img_url
+        if not img_desc_sent:
+            word.img_desc = None
+
+
+async def _store_picked_image(word: Word, source: str, image_id: str) -> str:
+    """Store the image picked for `word`; return its URL."""
+    try:
+        return await image_picks.store_pick(source, image_id)
+    except image_picks.ImageSearchOffError as exc:
+        raise ImageSearchOffError(str(exc)) from exc
+    except image_picks.PickedImageGoneError as exc:
+        raise PickedImageGoneError(str(exc)) from exc
+    except image_picks.PickedImageUnavailableError as exc:
+        raise PickedImageUnavailableError(str(exc)) from exc
+    except StorageError as exc:
+        logger.warning("Storing a picked image failed for word_id=%s: %s", word.id, exc)
+        raise MediaStorageUnavailableError("The image couldn't be stored, try saving again") from exc
 
 
 async def delete_word(db: AsyncSession, user_id: int, word_id: int) -> None:
@@ -488,6 +534,15 @@ async def get_words_by_ids(db: AsyncSession, user_id: int, word_ids: list[int]) 
 # --------------------------------------------------------------------------- #
 # Internals
 # --------------------------------------------------------------------------- #
+
+
+async def get_word(db: AsyncSession, user_id: int, word_id: int) -> Word:
+    """One of the user's saved words, with its examples, for other modules (e.g. images).
+
+    Raises:
+        WordNotFoundError: no such word, or it belongs to another user.
+    """
+    return await _get_owned_word(db, user_id, word_id)
 
 
 async def _get_owned_word(db: AsyncSession, user_id: int, word_id: int) -> Word:

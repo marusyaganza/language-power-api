@@ -16,6 +16,7 @@ from core.redis import redis_client
 from core.sentry import init_sentry
 from games.router import router as games_router
 from games.router import settings_router as game_settings_router
+from images.router import router as images_router
 from settings import settings
 from words.router import router as words_router
 
@@ -66,6 +67,8 @@ app.include_router(games_router, dependencies=_from_proxy)
 app.include_router(game_settings_router, dependencies=_from_proxy)
 # Listed in /docs only where audio generation is on: elsewhere every /audio route is a 404.
 app.include_router(audio_router, dependencies=_from_proxy, include_in_schema=bool(settings.audio_engines))
+# Listed in /docs only where image search is on, the same way.
+app.include_router(images_router, dependencies=_from_proxy, include_in_schema=bool(settings.image_search_providers))
 
 
 @app.get("/health", include_in_schema=False)

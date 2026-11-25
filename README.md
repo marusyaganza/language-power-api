@@ -16,7 +16,7 @@ Third version of the Language Power application: a vocabulary trainer for Englis
 
 - In active development
 - Deployed privately for my own daily use, with signup closed
-- In beta, on the private deployment only: Korean, and audio generation, which is still experimental. The demo offers English and Spanish
+- In beta, on the private deployment only: Korean, audio generation and image search, which are still experimental. The demo offers English and Spanish
 - Public demo: [language-power.netlify.app](https://language-power.netlify.app/); see [Demo](#demo)
 - Not a public production service
 
@@ -42,6 +42,7 @@ The app shows how many searches are left, and explains the limits when one is re
 - Practise saved words in six games: pick the meaning, pick the word, type the word, listen and type, name the picture, and noun gender (Spanish only)
 - Spaced-repetition scheduling per word and per game, with three presets or custom settings
 - Audio generation (beta, private deployment only): generate a saved word's pronunciation with Google Cloud Text-to-Speech, listen to it, try other voices, and keep it by saving the word
+- Image search (beta, private deployment only): search Pixabay for a picture of a saved word, starting from its English meaning, and keep one by saving the word
 
 The spaced repetition is a simplified scheduler inspired by Anki's learning steps and intervals, not a reproduction of its algorithm. The games, their rules and the scheduling are described in [docs/games.md](docs/games.md).
 
@@ -53,15 +54,16 @@ Each feature module (`auth`, `words`, `games`) is split the same way:
 
 - **Routers** handle HTTP only: they read the request, pass the logged-in user to a service, and map the service's errors to status codes.
 - **Services** hold the rules, raise domain errors that know nothing about HTTP, and own the transaction: each write ends in a single commit.
-- **Repositories** (`repository.py`) build the queries and never commit. Services only call `db.get` for a lookup by primary key. The exception is `users`, whose service is just two one-line lookups. `audio` has a router and a service but no repository: it stores nothing in PostgreSQL.
+- **Repositories** (`repository.py`) build the queries and never commit. Services only call `db.get` for a lookup by primary key. The exception is `users`, whose service is just two one-line lookups. `audio` and `images` have a router and a service but no repository: they store nothing in PostgreSQL of their own.
 
 Some rules hold everywhere:
 
 - Everything is async: SQLAlchemy 2.0 with psycopg 3, and the asyncio Redis client. CPU-bound work (bcrypt) runs in a thread so it does not block the event loop.
 - One database session per request. Relationships are never lazy-loaded: queries load what they need explicitly, and a missing load fails loudly instead of running a hidden query.
 - Data belongs to a user. A word or game session that belongs to someone else is reported exactly like one that does not exist.
-- Dictionary providers sit behind one interface, so the Merriam-Webster API clients, the Korean dictionary imported into PostgreSQL and the mock ones are interchangeable. Text-to-speech engines do the same (`audio/`).
+- Dictionary providers sit behind one interface, so the Merriam-Webster API clients, the Korean dictionary imported into PostgreSQL and the mock ones are interchangeable. Text-to-speech engines (`audio/`) and image search APIs (`images/`) do the same.
 - Generated audio is never stored before it's wanted. Each generation is held in Redis for 24 hours; saving the word uploads the chosen one, once, to Cloud Storage under the hash of its bytes, so trying voices costs no storage writes and a stored file never changes.
+- A picked image is never stored before it's wanted either. Search results are the source's own thumbnails, cached in Redis for 24 hours; saving the word looks the picked image up again by its id, downloads it, shrinks it to a 512 px WebP and uploads it once. The server only downloads URLs the image API returned, never one the client sent.
 
 ## Tech stack
 
@@ -72,6 +74,7 @@ Some rules hold everywhere:
 - Redis 7 for auth sessions and game sessions
 - httpx for the Merriam-Webster API
 - Google Cloud Text-to-Speech and Cloud Storage, for audio generation (beta)
+- The Pixabay API and Pillow, for image search (beta)
 - bcrypt for password hashing
 - pytest and pytest-cov, ruff
 - Docker, GitHub Actions and Google Cloud Run
@@ -82,12 +85,13 @@ Some rules hold everywhere:
 | --- | --- |
 | `main.py` | Creates the FastAPI app and includes the routers |
 | `settings.py` | All configuration, read from environment variables and `.env` |
-| `core/` | Database engine and session factory, Redis client, the `Language` and `AudioEngine` enums shared by every module, and media storage: Cloud Storage uploads and files held in Redis until saved |
+| `core/` | Database engine and session factory, Redis client, the `Language`, `AudioEngine` and `ImageSource` enums shared by every module, and media storage: Cloud Storage uploads and files held in Redis until saved |
 | `auth/` | Signup, login, logout, server-side sessions and the `get_current_user` dependency |
 | `users/` | User model, password hashing and user lookups |
 | `words/` | Dictionary search and the saved vocabulary |
 | `games/` | Game sessions, answer grading, spaced repetition and per-user settings |
 | `audio/` | Audio generation (beta): one synthesizer per engine (Google Cloud Text-to-Speech) and a mock, the voices, and the `/audio` routes |
+| `images/` | Image search (beta): one search per source (Pixabay) and a mock, the 24-hour cache, a word's English meaning as the query, the download and WebP conversion, and the `/images` routes |
 | `dictionary/` | One provider per language (`en/`, `es/`, `ko/`), the shared Merriam-Webster code (`merriam_webster/`), and the mock providers. `ko/` also holds the Korean tables and their import script ([ko/README.md](dictionary/ko/README.md)). [dictionary/README.md](dictionary/README.md) lists the steps for adding a language |
 | `dictionary/fixtures/` | Made-up entries in each source's format, with sample audio and pictures, for tests and local development ([fixtures/README.md](dictionary/fixtures/README.md)) |
 | `alembic/` | Database migrations |
